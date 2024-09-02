@@ -5,4 +5,3 @@ async fn main() {
     call_func().await;
     println!("Hello, world!");
 }
-

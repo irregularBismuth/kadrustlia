@@ -1,21 +1,22 @@
-FROM ubuntu:22.04 as builder
+FROM rust:latest as cargo-build
 
-RUN apt-get update && apt-get install -y \
-    curl \
-    build-essential \
-    iproute2 \
-    iputils-ping && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends musl-tools \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+RUN rustup target add x86_64-unknown-linux-musl
 
-ENV PATH="/root/.cargo/bin:${PATH}"
-
-WORKDIR /src/app
+WORKDIR /usr/src/kadrustlia
 
 COPY . .
 
-RUN cargo build --release
+RUN cargo build --release --target x86_64-unknown-linux-musl
 
-CMD ["./target/release/kadrustlia"]
+FROM alpine:latest
+
+WORKDIR /home/kadrustlia/bin/
+RUN apk add --no-cache file iproute2 iputils-ping 
+COPY --from=cargo-build /usr/src/kadrustlia/target/x86_64-unknown-linux-musl/release/kadrustlia .
+
+CMD ["./kadrustlia"]
+

@@ -23,10 +23,6 @@ Delete all containers
 ```sh
 docker rm -f $(docker ps -a -q)
 docker system prune -a --volumes
-docker build -t kademlia .
-docker compose up --build -d
-docker ps -a
-docker exec -it kadrustlia-node-1 /bin/sh
 ```
 
 Docker commands
@@ -35,5 +31,5 @@ Docker commands
 docker build -t kademlia .
 docker compose up --build -d
 docker ps -a
-docker exec -it kadrustlia-node-1 /bin/sh
+docker exec -it kadrustlia-kademliaNodes-1 /bin/sh
 ```

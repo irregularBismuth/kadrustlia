@@ -19,7 +19,7 @@ services:
       - BNPT=5678
     deploy:
       mode: replicated
-      replicas: 49
+      replicas: 5
     networks:
       - kademlia_network
       

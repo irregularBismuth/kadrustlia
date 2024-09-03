@@ -1,23 +1,11 @@
-FROM ubuntu:22.04
+from ubuntu:latest as builder 
 
-RUN apt-get update && apt-get install -y \
-    curl \
-    build-essential \
-    cmake \
-    iproute2 \
-    iputils-ping && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+run apt-get update && apt-get install -y iproute2 iputils-ping  curl build-essential && rm -rf /var/lib/apt/lists/*
+run curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
+workdir /src/app
+copy Cargo.toml ./
+copy src/ src/
+run cargo build --release
 
-WORKDIR /usr/src/kadrustlia
-
-COPY . .
-
-RUN cargo build --release
-
-WORKDIR /usr/src/kadrustlia/target/release
-
-CMD ["./kadrustlia"]
+CMD ["./target/release/kadrustlia"]

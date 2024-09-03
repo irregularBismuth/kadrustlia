@@ -1,19 +1,57 @@
-version: '3.8'
-
+version: "3"
 services:
-  node:
-    build: .
-    command: ["./kadrustlia"]
-    networks:
-      my_network:
+  bootNode:
+    image: kademlia:latest 
+    ports:
+      - "5678:5678"
+    stdin_open: true
+    tty: true
+    environment: 
+      - BN=1
     deploy:
-      replicas: 50
-      resources:
-        limits:
-          cpus: '0.1'
-          memory: 50M
-    restart: always
+      mode: replicated
+      replicas: 1 
+#        resources:
+#           limits:
+#              cpus: "0.1"
+#              memory: 50M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 10s
 
+          #    ports:
+          #      - "4000:80"
+    networks:
+      - kademlia_network
+
+  kademliaNodes:
+    image: kademlia:latest 
+    depends_on:
+      - bootNode
+    stdin_open: true
+    tty: true
+    environment: 
+      - BN=0
+      - BNAD=bootNode
+      - BNPT=5678
+    deploy:
+      mode: replicated
+      replicas: 50 
+#        resources:
+#           limits:
+#              cpus: "0.1"
+#              memory: 50M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 10s
+          #    ports:
+          #      - "4000:80"
+    networks:
+      - kademlia_network
+      
 networks:
-  my_network:
-    driver: bridge
+  kademlia_network:

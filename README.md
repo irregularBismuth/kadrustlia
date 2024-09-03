@@ -22,4 +22,18 @@ Delete all containers
 
 ```sh
 docker rm -f $(docker ps -a -q)
+docker system prune -a --volumes
+docker build -t kademlia .
+docker compose up --build -d
+docker ps -a
+docker exec -it kadrustlia-node-1 /bin/sh
+```
+
+Docker commands
+
+```sh
+docker build -t kademlia .
+docker compose up --build -d
+docker ps -a
+docker exec -it kadrustlia-node-1 /bin/sh
 ```

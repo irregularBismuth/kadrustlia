@@ -1,5 +1,4 @@
 use kadrustlia::cli::Cli;
-use tokio::io::{self, AsyncBufReadExt};
 async fn run() {
     println!("Test");
 }

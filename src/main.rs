@@ -1,9 +1,5 @@
 async fn run() {
-    println!(
-        " 
-        test from kademlia;
-    "
-    );
+    println!("Test");
 }
 
 #[tokio::main]

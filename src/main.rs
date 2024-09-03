@@ -1,3 +1,5 @@
+use kadrustlia::cli::Cli;
+use tokio::io::{self, AsyncBufReadExt};
 async fn run() {
     println!("Test");
 }
@@ -7,5 +9,7 @@ async fn main() {
     let fut = run();
     println!("Hello  world!");
     fut.await;
-    loop {}
+
+    let cli = Cli::new();
+    cli.read_input().await;
 }

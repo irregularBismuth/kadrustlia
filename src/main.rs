@@ -17,8 +17,9 @@ async fn main() {
     println!("{:?}", kad_id.to_hex());
 
     let kad_id2: KademliaID = KademliaID::new();
-
-    println!("xor distance {:?}", kad_id.distance(kad_id2));
+    println!("{:?}", kad_id2.to_hex());
+    println!("xor distance {:?}", kad_id.distance(&kad_id2));
+    println!("less {}", kad_id.less(&kad_id2));
     let cli = Cli::new();
     cli.read_input().await;
 }

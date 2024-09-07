@@ -1,6 +1,6 @@
 use crate::constants::ID_LENGTH;
 use rand::Rng;
-
+#[derive(Clone, Copy)]
 pub struct KademliaID {
     pub id: [u8; ID_LENGTH],
 }

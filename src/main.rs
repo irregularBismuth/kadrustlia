@@ -12,14 +12,13 @@ async fn main() {
     fut.await;
 
     let kad_id: KademliaID = KademliaID::new();
-    println!("{:?}", kad_id.id);
 
-    println!("{:?}", kad_id.to_hex());
+    let mut kad_id = KademliaID::new();
+    let kad_id2 = KademliaID::new().store_data("test".to_string()).to_hex();
 
-    let kad_id2: KademliaID = KademliaID::new();
-    println!("{:?}", kad_id2.to_hex());
-    println!("xor distance {:?}", kad_id.distance(&kad_id));
-    println!("less {}", kad_id.less(&kad_id2));
+    println!("{}", kad_id.to_hex());
+    println!("{}", kad_id.store_data("test".to_string()).to_hex());
+    println!("{}", kad_id2);
     let cli = Cli::new();
     cli.read_input().await;
 }

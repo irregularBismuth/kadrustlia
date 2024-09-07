@@ -1,5 +1,7 @@
 use crate::constants::ID_LENGTH;
 use rand::Rng;
+use sha2::{Digest, Sha256};
+
 #[derive(Clone, Copy)]
 pub struct KademliaID {
     pub id: [u8; ID_LENGTH],
@@ -10,6 +12,12 @@ impl KademliaID {
         let mut id = [0u8; ID_LENGTH];
         rand::thread_rng().fill(&mut id[..]);
         Self { id }
+    }
+
+    pub fn store_data(&mut self, data: String) -> Self {
+        let hash = Sha256::digest(data.as_bytes());
+        self.id.copy_from_slice(&hash[..ID_LENGTH]);
+        *self
     }
 
     pub fn to_hex(&self) -> String {

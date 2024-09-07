@@ -20,4 +20,11 @@ mod tests {
         let ac = kad_id_1.distance(&kad_id_3);
         assert!(ab + bc >= ac, "Triangle inequality failed");
     }
+
+    #[test]
+    fn hash_data() {
+        let kad_id = KademliaID::new().store_data("test".to_string()).to_hex();
+        let kad_id2 = KademliaID::new().store_data("test".to_string()).to_hex();
+        assert_eq!(kad_id, kad_id2, "Don't have same hash");
+    }
 }

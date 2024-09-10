@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package kademlia;
+
+service KademliaService {
+    rpc LookupContact(LookupRequest) returns (LookupResponse);
+}
+
+message LookupRequest { bytes contact_id = 1; }
+
+message LookupResponse { repeated Contact contacts = 1; }
+
+message Contact {
+    bytes contact_id = 1;
+    string address = 2;
+}

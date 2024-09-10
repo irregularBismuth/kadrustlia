@@ -4,6 +4,7 @@ services:
     image: kademlia:latest 
     ports:
       - "5678:5678"
+      - "50051:50051"
     environment: 
       - BN=1
     networks:

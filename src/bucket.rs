@@ -2,7 +2,8 @@ use crate::contact::Contact;
 use crate::kademlia_id::KademliaID;
 use std::collections::LinkedList;
 
-struct Bucket {
+#[derive(Clone)]
+pub struct Bucket {
     list: LinkedList<Contact>,
 }
 

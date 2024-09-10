@@ -1,8 +1,10 @@
 use kadrustlia::cli::Cli;
 
-use kadrustlia::contact::Contact;
-use kadrustlia::contact::ContactCandidates;
-use kadrustlia::kademlia_id::KademliaID;
+use kadrustlia::{
+    contact::Contact, contact::ContactCandidates, kademlia_id::KademliaID,
+    routing_table::RoutingTable,
+};
+
 async fn run() {
     println!("Test");
 }
@@ -13,15 +15,16 @@ async fn main() {
     println!("Hello  world!");
     fut.await;
 
-    let mut candidates = ContactCandidates::new();
+    /*    let mut candidates = ContactCandidates::new();
     candidates.append(&mut vec![
         Contact::new(KademliaID::new(), "192.168.1.1".to_string()),
         Contact::new(KademliaID::new(), "192.168.2.21".to_string()),
-    ]);
+    ]); */
+    let ct = Contact::new(KademliaID::new(), "192.168.1.2".to_string());
 
-    // Compare the contacts at index 0 and 1
-    let result = candidates.less(0, 1);
-    println!("{}", result);
+    let rt = RoutingTable::new(ct);
+    //let result = candidates.less(0, 1);
+    //println!("{}", result);
     let cli = Cli::new();
     cli.read_input().await;
 }

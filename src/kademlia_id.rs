@@ -1,6 +1,9 @@
-use crate::constants::ID_LENGTH;
-use rand::Rng;
-use sha2::{Digest, Sha256};
+use {
+    crate::constants::ID_LENGTH,
+    rand::Rng,
+    sha2::{Digest, Sha256},
+    std::cmp::*,
+};
 
 type KadId = [u8; ID_LENGTH];
 
@@ -41,9 +44,32 @@ impl KademliaID {
     pub fn equals(&self, other: &KademliaID) -> bool {
         self.id.iter().zip(other.id.iter()).all(|(a, b)| a == b)
     }
-
     pub fn distance(&self, other: &KademliaID) -> KademliaID {
-        let dist: KadId = core::array::from_fn(|i| self.id[i] ^ other.id[i]);
-        KademliaID::with_id(dist)
+        KademliaID::with_id(core::array::from_fn(|i| self.id[i] ^ other.id[i]))
+    }
+}
+
+impl PartialEq for KademliaID {
+    fn eq(&self, other: &Self) -> bool {
+        self.equals(other)
+    }
+}
+impl Eq for KademliaID {}
+
+impl PartialOrd for KademliaID {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for KademliaID {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.less(other) {
+            Ordering::Less
+        } else if other.less(self) {
+            Ordering::Greater
+        } else {
+            Ordering::Equal
+        }
     }
 }

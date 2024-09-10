@@ -44,6 +44,6 @@ impl KademliaID {
 
     pub fn distance(&self, other: &KademliaID) -> KademliaID {
         let dist: KadId = core::array::from_fn(|i| self.id[i] ^ other.id[i]);
-        KademliaID { id: dist }
+        KademliaID::with_id(dist)
     }
 }

@@ -1,8 +1,9 @@
 use crate::kademlia_id::KademliaID;
+
 pub struct Contact {
     id: KademliaID,
     address: String,
-    pub distance: Option<KademliaID>,
+    distance: Option<KademliaID>,
 }
 
 impl Contact {

@@ -12,15 +12,10 @@ async fn main() {
     println!("Hello  world!");
     fut.await;
 
-    let kad_id: KademliaID = KademliaID::new();
+    let kad_id: KademliaID = KademliaID::with_id([0u8; 20]);
+    let kad_id_2: KademliaID = KademliaID::with_id([150u8; 20]);
+    println!("{}", kad_id.distance(&kad_id_2).to_hex());
 
-    let mut kad_id = KademliaID::new();
-    let kad_id2 = KademliaID::new();
-    let mut contact = Contact::new(kad_id, "2123".to_string());
-    contact.calc_distance(&kad_id2);
-    println!("Contact distance to target: {}", contact.distance);
-    println!("{}", kad_id.to_hex());
-    println!("{}", kad_id.store_data("test".to_string()).to_hex());
     let cli = Cli::new();
     cli.read_input().await;
 }

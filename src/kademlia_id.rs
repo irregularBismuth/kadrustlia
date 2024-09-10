@@ -11,7 +11,7 @@ pub struct KademliaID {
 
 impl KademliaID {
     pub fn new() -> Self {
-        let mut id = [0u8; ID_LENGTH];
+        let mut id: KadId = [0u8; ID_LENGTH];
         rand::thread_rng().fill(&mut id[..]);
         Self { id }
     }

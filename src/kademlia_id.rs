@@ -2,9 +2,11 @@ use crate::constants::ID_LENGTH;
 use rand::Rng;
 use sha2::{Digest, Sha256};
 
+type KadId = [u8; ID_LENGTH];
+
 #[derive(Clone, Copy)]
 pub struct KademliaID {
-    pub id: [u8; ID_LENGTH],
+    pub id: KadId,
 }
 
 impl KademliaID {
@@ -33,14 +35,18 @@ impl KademliaID {
     }
 
     pub fn equals(&self, other: &KademliaID) -> bool {
-        self.distance(other) == 0
+        self.id.iter().zip(other.id.iter()).all(|(a, b)| a == b)
     }
 
-    pub fn distance(&self, other: &KademliaID) -> usize {
-        self.id
+    pub fn distance(&self, other: &KademliaID) -> KademliaID {
+        let dist: KadId = self
+            .id
             .iter()
             .zip(other.id.iter())
-            .map(|(a, b)| (a ^ b) as usize)
-            .sum()
+            .map(|(a, b)| (a ^ b))
+            .collect::<Vec<u8>>()
+            .try_into()
+            .expect("invalid length");
+        KademliaID { id: dist }
     }
 }

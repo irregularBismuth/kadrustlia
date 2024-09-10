@@ -2,7 +2,7 @@ use crate::kademlia_id::KademliaID;
 pub struct Contact {
     id: KademliaID,
     address: String,
-    pub distance: usize,
+    pub distance: Option<KademliaID>,
 }
 
 impl Contact {
@@ -10,12 +10,12 @@ impl Contact {
         Self {
             id,
             address: "".to_string(),
-            distance: 0,
+            distance: None,
         }
     }
 
     pub fn calc_distance(&mut self, target: &KademliaID) -> &mut Self {
-        self.distance = target.distance(&self.id);
+        self.distance = Some(target.distance(&self.id));
         self
     }
 }

@@ -1,8 +1,10 @@
-use ::tokio::io::{self, AsyncBufReadExt};
+use ::tokio::io::{self, AsyncBufReadExt, AsyncWriteExt};
+use crate::client::Client;
+
 enum Command {
-    GET,
-    PUT,
-    DELETE,
+    GET(String),
+    PUT(String),
+    EXIT,
 }
 
 pub struct Cli {}
@@ -12,44 +14,68 @@ impl Cli {
         Cli {}
     }
 
-    pub async fn read_input(&self) {
+    pub async fn read_input(&self, client: &mut Client) {
         let stdin = io::stdin();
         let mut reader = io::BufReader::new(stdin).lines();
-        while let Some(line) = reader.next_line().await.unwrap() {
-            let input = line.trim().to_lowercase();
-            let command = self.parse_command(&input);
-            self.execute_command(command);
-        }
-    }
 
-    fn execute_command(&self, cmd: Command) {
-        match cmd {
-            Command::GET => Self::get(),
-            Command::PUT => Self::put(),
-            Command::DELETE => Self::delete(),
-        }
-    }
+        loop {
+            io::stdout().flush().await.unwrap();
 
-    fn parse_command(&self, input: &str) -> Command {
-        match input {
-            "get" => Command::GET,
-            "put" => Command::PUT,
-            "delete" => Command::DELETE,
-            _ => {
-                panic!("command not found ");
+            if let Some(line) = reader.next_line().await.unwrap() {
+                let input = line.trim().to_lowercase();
+
+                match self.parse_command(&input) {
+                    Ok(command) => {
+                        if let Command::EXIT = command {
+                            println!("bombaclat node");
+                            break;
+                        }
+                        self.execute_command(command, client).await;
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                }
             }
         }
     }
 
-    fn get() {
-        println!("Executing GET command...");
+    async fn execute_command(&self, cmd: Command, client: &mut Client) {
+        match cmd {
+            Command::GET(hash) => {
+                client.lookup_data(hash).await.unwrap();
+            }
+            Command::PUT(data) => {
+                let data = data.as_bytes().to_vec();
+                client.store(data).await.unwrap();
+            }
+            Command::EXIT => {
+                println!("Exiting...");
+            }
+        }
     }
 
-    fn put() {
-        println!("Executing PUT command...");
-    }
+    fn parse_command(&self, input: &str) -> Result<Command, &'static str> {
+        let mut parts = input.split_whitespace();
+        let command = parts.next().unwrap_or_default();
 
-    fn delete() {
-        println!("Executing DELETE command...");
+        match command {
+            "get" => {
+                if let Some(arg) = parts.next() {
+                    Ok(Command::GET(arg.to_string()))
+                } else {
+                    Err("GET: missing hash argument")
+                }
+            }
+            "put" => {
+                if let Some(arg) = parts.next() {
+                    Ok(Command::PUT(arg.to_string()))
+                } else {
+                    Err("PUT: missing data argument")
+                }
+            }
+            "exit" => Ok(Command::EXIT),
+            _ => Err("Unknown command"),
+        }
     }
 }

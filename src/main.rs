@@ -1,43 +1,23 @@
 use std::net::SocketAddr;
-
 use kadrustlia::kademlia;
-
+use kadrustlia::client::Client;
+use kadrustlia::cli::Cli;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr: SocketAddr = "[::1]:50051".parse()?;
-
     tokio::spawn(async move {
         kademlia::start_server(&addr).await.unwrap();
-    })
-    .await?;
+    });
 
-    Ok(())
-}
+    println!("Server started on {}", addr);
 
-/*use std::vec;
-
-use kadrustlia::cli::Cli;
-
-use kadrustlia::contact::Contact;
-use kadrustlia::kademlia_id::KademliaID;
-
-async fn run() {
-    println!("Test");
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let fut = run();
-    println!("Hello  world!");
-    fut.await;
-
-    let kad_id: KademliaID = KademliaID::with_id([0u8; 20]);
-    let kad_id_2: KademliaID = KademliaID::with_id([150u8; 20]);
-    println!("{}", kad_id.distance(&kad_id_2).to_hex());
+    let client_url = format!("http://{}", addr);
+    let mut client = Client::new(client_url).await?;
 
     let cli = Cli::new();
-    cli.read_input().await;
+
+    cli.read_input(&mut client).await;
 
     Ok(())
-}*/
+}

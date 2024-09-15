@@ -3,7 +3,7 @@ use tonic::{transport::Server, Request, Response, Status};
 use proto::kademlia_server::{Kademlia, KademliaServer};
 use proto::{LookupContactRequest, LookupContactResponse, LookupDataRequest, LookupDataResponse, StoreRequest, StoreResponse, Node};
 
-mod proto {
+pub mod proto {
     tonic::include_proto!("kademlia");
 }
 

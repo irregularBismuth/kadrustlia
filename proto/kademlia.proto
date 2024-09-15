@@ -2,15 +2,41 @@ syntax = "proto3";
 
 package kademlia;
 
-service KademliaService {
-    rpc LookupContact(LookupRequest) returns (LookupResponse);
+service Kademlia {
+    rpc LookupContact (LookupContactRequest) returns (LookupContactResponse);
+    rpc LookupData (LookupDataRequest) returns (LookupDataResponse);
+    rpc Store (StoreRequest) returns (StoreResponse);
 }
 
-message LookupRequest { bytes contact_id = 1; }
+message LookupContactRequest {
+    string contact_id = 1;
+}
 
-message LookupResponse { repeated Contact contacts = 1; }
+message LookupContactResponse {
+    repeated Node nodes = 1;
+}
 
-message Contact {
-    bytes contact_id = 1;
+message LookupDataRequest {
+    string hash = 1;
+}
+
+message LookupDataResponse {
+    string data = 1;
+}
+
+message StoreRequest {
+    bytes data = 1;
+}
+
+message StoreResponse {
+    bool success = 1;
+}
+
+message Node {
+    string node_id = 1;
     string address = 2;
 }
+
+// grpcurl -plaintext -proto ./proto/kademlia.proto -d '{"contact_id": "123"}' [::1]:50051 kademlia.Kademlia/LookupContact
+// grpcurl -plaintext -proto ./proto/kademlia.proto -d '{"hash": "example_hash"}' [::1]:50051 kademlia.Kademlia/LookupData
+// grpcurl -plaintext -proto ./proto/kademlia.proto -d '{"data": "VGhpcyBpcyBhIHRlc3Q="}' [::1]:50051 kademlia.Kademlia/Store

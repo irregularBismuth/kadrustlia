@@ -17,8 +17,12 @@ RUN cargo build --release --target x86_64-unknown-linux-musl
 FROM alpine:latest
 
 WORKDIR /home/kadrustlia/bin/
-RUN apk add --no-cache file iproute2 iputils-ping 
+
+RUN apk add --no-cache file iproute2 iputils-ping
+RUN apk update && apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing grpcurl
 
 COPY --from=cargo-build /usr/src/kadrustlia/target/x86_64-unknown-linux-musl/release/kadrustlia .
+
+COPY ./proto /proto
 
 CMD ["./kadrustlia"]

@@ -3,7 +3,6 @@ services:
   bootNode:
     image: kademlia:latest 
     ports:
-      - "5678:5678"
       - "50051:50051"
     environment: 
       - BN=1
@@ -17,7 +16,7 @@ services:
     environment: 
       - BN=0
       - BNAD=bootNode
-      - BNPT=5678
+      - BNPT=50051
     deploy:
       mode: replicated
       replicas: 5

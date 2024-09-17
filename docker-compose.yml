@@ -1,27 +1,31 @@
-version: "3"
 services:
   bootNode:
-    image: kademlia:latest 
+    image: kademlia:latest
     ports:
-      - "5678:5678"
+      - "50051:50051"
     environment: 
       - BN=1
     networks:
       - kademlia_network
+    stdin_open: true
+    tty: true
 
   kademliaNodes:
-    image: kademlia:latest 
+    image: kademlia:latest
     depends_on:
       - bootNode
-    environment: 
+    environment:
       - BN=0
       - BNAD=bootNode
-      - BNPT=5678
+      - BNPT=50051
     deploy:
       mode: replicated
       replicas: 5
+
+    stdin_open: true
+    tty: true
     networks:
       - kademlia_network
-      
+
 networks:
   kademlia_network:

@@ -1,26 +1,44 @@
+use std::net::SocketAddr;
+use kadrustlia::kademlia;
+use kadrustlia::client::Client;
 use kadrustlia::cli::Cli;
 
-use kadrustlia::contact::Contact;
-use kadrustlia::kademlia_id::KademliaID;
-async fn run() {
-    println!("Test");
-}
+
+use kadrustlia::{
+    contact::Contact, contact::ContactCandidates, kademlia_id::KademliaID,
+    routing_table::RoutingTable,
+};
+
 
 #[tokio::main]
-async fn main() {
-    let fut = run();
-    println!("Hello  world!");
-    fut.await;
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    //let addr: SocketAddr = "[::1]:50051".parse()?;
+    let addr: SocketAddr = "0.0.0.0:50051".parse()?;
 
-    let kad_id: KademliaID = KademliaID::new();
+    tokio::spawn(async move {
+        kademlia::start_server(&addr).await.unwrap();
+    });
 
-    let mut kad_id = KademliaID::new();
-    let kad_id2 = KademliaID::new();
-    let mut contact = Contact::new(kad_id, "2123".to_string());
-    contact.calc_distance(&kad_id2);
-    println!("Contact distance to target: {}", contact.distance);
-    println!("{}", kad_id.to_hex());
-    println!("{}", kad_id.store_data("test".to_string()).to_hex());
+    println!("Server started on {}", addr);
+
+
+    /*    let mut candidates = ContactCandidates::new();
+    candidates.append(&mut vec![
+        Contact::new(KademliaID::new(), "192.168.1.1".to_string()),
+        Contact::new(KademliaID::new(), "192.168.2.21".to_string()),
+    ]); */
+    let ct = Contact::new(KademliaID::new(), "192.168.1.2".to_string());
+
+    // let client_url = format!("http://{}", addr);
+    let client_url = format!("http://bootNode:50051");
+    let mut client = Client::new(client_url).await?;
+
+    let rt = RoutingTable::new(ct);
+    //let result = candidates.less(0, 1);
+    //println!("{}", result);
     let cli = Cli::new();
-    cli.read_input().await;
+
+    cli.read_input(&mut client).await;
+
+    Ok(())
 }

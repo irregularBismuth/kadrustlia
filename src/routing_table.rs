@@ -76,3 +76,4 @@ impl RoutingTable {
         candidates.get_contacts(count_).to_vec()
     }
 }
+

@@ -1,7 +1,10 @@
+use proto::kademlia_server::{Kademlia, KademliaServer};
+use proto::{
+    LookupContactRequest, LookupContactResponse, LookupDataRequest, LookupDataResponse, Node,
+    StoreRequest, StoreResponse,
+};
 use std::net::SocketAddr;
 use tonic::{transport::Server, Request, Response, Status};
-use proto::kademlia_server::{Kademlia, KademliaServer};
-use proto::{LookupContactRequest, LookupContactResponse, LookupDataRequest, LookupDataResponse, StoreRequest, StoreResponse, Node};
 
 pub mod proto {
     tonic::include_proto!("kademlia");
@@ -17,7 +20,10 @@ impl Kademlia for KademliaService {
         request: Request<LookupContactRequest>,
     ) -> Result<Response<LookupContactResponse>, Status> {
         let req = request.into_inner();
-        println!("LookupContact request received for contact_id={}", req.contact_id);
+        println!(
+            "LookupContact request received for contact_id={}",
+            req.contact_id
+        );
 
         let nodes = vec![
             Node {
@@ -41,7 +47,7 @@ impl Kademlia for KademliaService {
         let req = request.into_inner();
         println!("LookupData request received for hash={}", req.hash);
 
-        let data = "data".to_string(); 
+        let data = "data".to_string();
 
         let reply = LookupDataResponse { data };
         Ok(Response::new(reply))

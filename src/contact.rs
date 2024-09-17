@@ -2,6 +2,7 @@ use crate::kademlia_id::KademliaID;
 use std::cmp::Ordering;
 
 #[derive(Clone)]
+
 pub struct Contact {
     pub id: KademliaID,
     address: String,

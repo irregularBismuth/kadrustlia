@@ -16,6 +16,18 @@ TODO:
 docker build -t kademlia .
 ```
 
+## Running the image
+
+```sh
+docker run -it kadrustlia
+```
+
+## Running locally
+
+```sh
+cargo run --release
+```
+
 ## Useful commands
 
 Delete all containers

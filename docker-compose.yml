@@ -9,7 +9,6 @@ services:
       - kademlia_network
     stdin_open: true
     tty: true
-
   kademliaNodes:
     image: kademlia:latest
     depends_on:
@@ -21,7 +20,6 @@ services:
     deploy:
       mode: replicated
       replicas: 5
-
     stdin_open: true
     tty: true
     networks:

@@ -8,12 +8,12 @@ pub struct Bucket {
 }
 
 impl Bucket {
+
     pub fn new() -> Self {
         Self {
             list: LinkedList::<Contact>::new(),
         }
     }
-
     pub fn add_contact(&mut self, contact: Contact) -> &Self {
         self.list.push_back(contact);
         self

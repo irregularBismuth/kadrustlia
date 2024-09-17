@@ -6,4 +6,6 @@ pub mod kademlia;
 pub mod kademlia_id;
 pub mod networking;
 pub mod tests;
+pub mod routing_table;
 pub mod utils;
+pub mod client;

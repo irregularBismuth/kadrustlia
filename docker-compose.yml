@@ -8,20 +8,25 @@ services:
       - BN=1
     networks:
       - kademlia_network
-
+    stdin_open: true
+    tty: true
+    
   kademliaNodes:
     image: kademlia:latest 
     depends_on:
       - bootNode
-    environment: 
+    environment:
+      - LISTENER=0
       - BN=0
       - BNAD=bootNode
       - BNPT=5678
     deploy:
       mode: replicated
       replicas: 5
+    stdin_open: true
+    tty: true
     networks:
       - kademlia_network
-      
+
 networks:
   kademlia_network:

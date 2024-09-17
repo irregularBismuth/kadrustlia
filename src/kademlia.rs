@@ -8,10 +8,10 @@ pub mod proto {
 }
 
 #[derive(Debug, Default)]
-pub struct MyKademlia;
+pub struct KademliaService;
 
 #[tonic::async_trait]
-impl Kademlia for MyKademlia {
+impl Kademlia for KademliaService {
     async fn lookup_contact(
         &self,
         request: Request<LookupContactRequest>,
@@ -62,7 +62,7 @@ impl Kademlia for MyKademlia {
 }
 
 pub async fn start_server(addr: &SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
-    let kad = MyKademlia::default();
+    let kad = KademliaService::default();
 
     println!("Starting server...");
 

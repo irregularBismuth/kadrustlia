@@ -14,6 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Server started on {}", addr);
 
+    // let client_url = format!("http://{}", addr);
     let client_url = format!("http://bootNode:50051");
     let mut client = Client::new(client_url).await?;
 

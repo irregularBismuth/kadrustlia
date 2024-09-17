@@ -20,6 +20,8 @@ services:
     deploy:
       mode: replicated
       replicas: 5
+    stdin_open: true
+    tty: true
     networks:
       - kademlia_network
       

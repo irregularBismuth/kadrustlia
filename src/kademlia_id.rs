@@ -7,8 +7,6 @@ use {
 
 type KadId = [u8; ID_LENGTH];
 
-type KadId = [u8; ID_LENGTH];
-
 #[derive(Clone, Copy)]
 pub struct KademliaID {
     pub id: KadId,

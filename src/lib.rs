@@ -4,6 +4,6 @@ pub mod constants;
 pub mod contact;
 pub mod kademlia;
 pub mod kademlia_id;
-pub mod ping;
+pub mod networking;
 pub mod tests;
 pub mod utils;

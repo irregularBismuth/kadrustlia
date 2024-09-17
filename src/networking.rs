@@ -1,8 +1,8 @@
 use tokio::net::UdpSocket;
 
-pub struct Ping;
+pub struct Networking;
 
-impl Ping {
+impl Networking {
     pub async fn send_ping(target_addr: &str) -> std::io::Result<()> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         let ping_msg = "PING";

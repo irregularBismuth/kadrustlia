@@ -1,6 +1,6 @@
 use kadrustlia::cli::Cli;
 use kadrustlia::kademlia_id::KademliaID;
-use kadrustlia::ping::Ping;
+use kadrustlia::networking::Networking;
 
 #[tokio::main]
 async fn main() {
@@ -12,17 +12,17 @@ async fn main() {
 
     let bind_addr = "0.0.0.0:5678";
     tokio::spawn(async move {
-        Ping::listen_for_ping(bind_addr)
+        Networking::listen_for_ping(bind_addr)
             .await
             .expect("Failed to listen for PING");
     });
+    /*
+        let target_container = "kadrustlia-kademliaNodes-2:5678";
 
-    // let target_container = "kadrustlia-kademliaNodes-2:5678";
-
-    // Ping::send_ping(target_container)
-    //     .await
-    //     .expect("Failed to send PING");
-
+        Networking::send_ping(target_container)
+            .await
+            .expect("Failed to send PING");
+    */
     let cli = Cli::new();
     cli.read_input().await;
 }

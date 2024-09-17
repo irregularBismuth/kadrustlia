@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 
 #[derive(Clone)]
 pub struct Contact {
-    id: KademliaID,
+    pub id: KademliaID,
     address: String,
     distance: Option<KademliaID>,
 }

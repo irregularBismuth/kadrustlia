@@ -8,18 +8,18 @@ pub struct Bucket {
 }
 
 impl Bucket {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             list: LinkedList::<Contact>::new(),
         }
     }
 
-    fn add_contact(&mut self, contact: Contact) -> &Self {
+    pub fn add_contact(&mut self, contact: Contact) -> &Self {
         self.list.push_back(contact);
         self
     }
 
-    fn get_contact_and_calc_distance(&mut self, target: KademliaID) -> Vec<Contact> {
+    pub fn get_contact_and_calc_distance(&mut self, target: KademliaID) -> Vec<Contact> {
         let mut contacts: Vec<Contact> = Vec::new();
         for contact in self.list.iter_mut() {
             contact.calc_distance(&target);

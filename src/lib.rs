@@ -7,3 +7,4 @@ pub mod kademlia_id;
 pub mod routing_table;
 pub mod tests;
 pub mod utils;
+pub mod client;

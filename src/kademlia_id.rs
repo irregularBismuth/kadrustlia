@@ -1,13 +1,14 @@
 use {
     crate::constants::ID_LENGTH,
     rand::Rng,
+    serde::{Deserialize, Serialize},
     sha2::{Digest, Sha256},
     std::cmp::*,
 };
 
 type KadId = [u8; ID_LENGTH];
 
-#[derive(Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct KademliaID {
     pub id: KadId,
 }

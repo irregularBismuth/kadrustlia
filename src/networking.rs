@@ -13,7 +13,7 @@ impl Networking {
         Ok(())
     }
 
-    pub async fn listen_for_ping(bind_addr: &str) -> std::io::Result<()> {
+    pub async fn listen_for_rpc(bind_addr: &str) -> std::io::Result<()> {
         let socket = UdpSocket::bind(bind_addr).await?;
         println!("Listening for PINGs on {}", bind_addr);
 

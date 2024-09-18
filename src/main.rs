@@ -9,27 +9,37 @@ use std::net::SocketAddr;
             .expect("Failed to send PING");
 */
 use kadrustlia::networking::Networking;
+use kadrustlia::rpc::RpcMessage;
 use kadrustlia::{
     contact::Contact, contact::ContactCandidates, kademlia_id::KademliaID,
     routing_table::RoutingTable,
 };
 
+use kadrustlia::constants::rpc::Command;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let addr: SocketAddr = "[::1]:50051".parse()?;
-    let addr: SocketAddr = "0.0.0.0:50051".parse()?;
 
-    tokio::spawn(async move {
-        kademlia::start_server(&addr).await.unwrap();
-    });
-
-    println!("Server started on {}", addr);
     let bind_addr = "0.0.0.0:5678";
     tokio::spawn(async move {
-        Networking::listen_for_ping(bind_addr)
+        Networking::listen_for_rpc(bind_addr)
             .await
             .expect("Failed to listen for PING");
     });
+
+    let message = RpcMessage::Request {
+        id: KademliaID::new(),
+        method: Command::PING,
+        params: vec!["Alice".to_string()],
+    };
+    println!("{:?}", message);
+    let data = bincode::serialize(&message).expect("Failed to serialize message");
+
+    println!("{:?}", data);
+
+    let readable: RpcMessage = bincode::deserialize(&data).expect("Failed to deserialize message");
+
+    println!("{:?}", readable);
 
     /*    let mut candidates = ContactCandidates::new();
     candidates.append(&mut vec![
@@ -38,12 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ]); */
     let ct = Contact::new(KademliaID::new(), "192.168.1.2".to_string());
 
-    // let client_url = format!("http://{}", addr);
-    let client_url = format!("http://bootNode:50051");
-
     let rt = RoutingTable::new(ct);
-    //let result = candidates.less(0, 1);
-    //println!("{}", result);
 
     let cli = Cli::new();
 

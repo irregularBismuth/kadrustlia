@@ -27,7 +27,7 @@ impl RoutingTable {
             .iter()
             .flat_map(|&byte| (0..8).rev().map(move |i| (byte >> i) & 1))
             .position(|bit| bit != 0)
-            .unwrap_or(ID_LENGTH * 8 - 1)
+            .unwrap_or(RT_BCKT_SIZE - 1)
     }
 
     pub fn add_contact(&mut self, contact: Contact) {
@@ -65,7 +65,6 @@ impl RoutingTable {
                     candidates.append(&mut cntcs);
                 }
             }
-
             i = i + 1;
         }
         candidates.sort();
@@ -76,4 +75,3 @@ impl RoutingTable {
         candidates.get_contacts(count_).to_vec()
     }
 }
-

@@ -15,3 +15,7 @@ pub fn boot_node_address() -> String {
         "BN is not set".to_string()
     }
 }
+
+pub fn get_own_address() -> String {
+    env::var("ADDR").unwrap_or_else(|_| "127.0.0.1".to_string())
+}

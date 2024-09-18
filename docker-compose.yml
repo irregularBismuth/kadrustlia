@@ -5,6 +5,7 @@ services:
       - "50051:50051"
     environment: 
       - BN=1
+      - ADDR=bootNode
     networks:
       - kademlia_network
     stdin_open: true
@@ -17,6 +18,7 @@ services:
       - BN=0
       - BNAD=bootNode
       - BNPT=50051
+      - ADDR=kademliaNodes
     deploy:
       mode: replicated
       replicas: 5

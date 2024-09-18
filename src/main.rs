@@ -1,5 +1,4 @@
 use kadrustlia::cli::Cli;
-use kadrustlia::client::Client;
 use kadrustlia::kademlia;
 use std::net::SocketAddr;
 /*
@@ -41,7 +40,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // let client_url = format!("http://{}", addr);
     let client_url = format!("http://bootNode:50051");
-    let mut client = Client::new(client_url).await?;
 
     let rt = RoutingTable::new(ct);
     //let result = candidates.less(0, 1);
@@ -49,8 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cli = Cli::new();
 
-    cli.read_input(&mut client).await;
+    cli.read_input().await;
 
     Ok(())
 }
-

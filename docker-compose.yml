@@ -18,7 +18,6 @@ services:
       - BN=0
       - BNAD=bootNode
       - BNPT=50051
-      - ADDR=kademliaNodes
     deploy:
       mode: replicated
       replicas: 5

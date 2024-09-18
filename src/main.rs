@@ -5,6 +5,9 @@ use {
         rpc::RpcMessage, utils,
     },
     std::net::SocketAddr,
+    std::sync::Arc,
+    tokio::net::ToSocketAddrs,
+    tokio::sync::Mutex,
 };
 
 async fn root() -> &'static str {
@@ -28,10 +31,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
     //#################################
 
-    let cli = Cli::new();
-    let mut kademlia_instance: Kademlia = Kademlia::new();
-    kademlia_instance.join().await;
-    cli.read_input().await;
+    println!("addr : {:?}", utils::get_own_address());
 
+    let kademlia_instance = Arc::new(Mutex::new(Kademlia::new()));
+
+    let kademlia_for_join = Arc::clone(&kademlia_instance);
+    let kademlia_for_cli = Arc::clone(&kademlia_instance);
+
+    tokio::join!(
+        async {
+            let mut instance = kademlia_for_join.lock().await;
+            instance.join().await;
+        },
+        async {
+            let mut instance = kademlia_for_cli.lock().await;
+            instance.start_cli().await;
+        }
+    );
     Ok(())
 }

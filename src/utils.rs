@@ -1,5 +1,5 @@
 use std::env;
-
+use std::process;
 pub fn check_bn() -> bool {
     let bn_value = env::var("BN").unwrap_or_else(|_| "0".to_string());
     bn_value == "1"
@@ -17,5 +17,9 @@ pub fn boot_node_address() -> String {
 }
 
 pub fn get_own_address() -> String {
-    env::var("ADDR").unwrap_or_else(|_| "127.0.0.1".to_string())
+    let output = process::Command::new("hostname")
+        .arg("-i")
+        .output()
+        .expect("failed to execute hostname command");
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
 }

@@ -24,7 +24,7 @@ async fn root() -> &'static str {
     "Hello world!"
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let addr: SocketAddr = "[::1]:50051".parse()?;
 

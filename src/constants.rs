@@ -10,7 +10,6 @@ pub mod rpc {
     pub enum Command {
         PING,
         PONG,
-        JOIN,
         FINDNODE,
         FINDVALUE,
     }

@@ -16,6 +16,7 @@ use kadrustlia::{
 };
 
 use kadrustlia::constants::rpc::Command;
+use kadrustlia::utils;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let addr: SocketAddr = "[::1]:50051".parse()?;
@@ -26,21 +27,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await
             .expect("Failed to listen for PING");
     });
+    /*
+        let message = RpcMessage::Request {
+            id: 1,
+            method: Command::PING,
+            params: vec!["Alice".to_string()],
+        };
+        println!("{:?}", message);
+        let data = bincode::serialize(&message).expect("Failed to serialize message");
 
-    let message = RpcMessage::Request {
-        id: KademliaID::new(),
-        method: Command::PING,
-        params: vec!["Alice".to_string()],
-    };
-    println!("{:?}", message);
-    let data = bincode::serialize(&message).expect("Failed to serialize message");
+        println!("{:?}", data);
 
-    println!("{:?}", data);
+        let readable: RpcMessage = bincode::deserialize(&data).expect("Failed to deserialize message");
 
-    let readable: RpcMessage = bincode::deserialize(&data).expect("Failed to deserialize message");
-
-    println!("{:?}", readable);
-
+        println!("{:?}", readable);
+    */
     /*    let mut candidates = ContactCandidates::new();
     candidates.append(&mut vec![
         Contact::new(KademliaID::new(), "192.168.1.1".to_string()),
@@ -49,6 +50,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ct = Contact::new(KademliaID::new(), "192.168.1.2".to_string());
 
     let rt = RoutingTable::new(ct);
+    let bootNode: bool = utils::check_bn();
+    if !bootNode {
+        let boot_node_addr: String = utils::boot_node_address();
+        println!(" boot node address {}", boot_node_addr);
+        let boot_node_addr: String = format!("{}:{}", boot_node_addr, "5678");
+        tokio::spawn(async move {
+            Networking::send_ping(&boot_node_addr, Command::PING)
+                .await
+                .expect("failed to send PING");
+        });
+    }
 
     let cli = Cli::new();
 

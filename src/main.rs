@@ -8,6 +8,7 @@ use std::net::SocketAddr;
             .await
             .expect("Failed to send PING");
 */
+
 use kadrustlia::networking::Networking;
 use kadrustlia::rpc::RpcMessage;
 use kadrustlia::{
@@ -15,8 +16,14 @@ use kadrustlia::{
     routing_table::RoutingTable,
 };
 
+use axum::{http::StatusCode, routing::get, Json, Router};
 use kadrustlia::constants::rpc::Command;
 use kadrustlia::utils;
+
+async fn root() -> &'static str {
+    "Hello world!"
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let addr: SocketAddr = "[::1]:50051".parse()?;
@@ -27,6 +34,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await
             .expect("Failed to listen for PING");
     });
+    // REST interface
+    tokio::spawn(async move {
+        let app = Router::new().route("/", get(root));
+        let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+        axum::serve(listener, app).await.unwrap();
+    });
+
     /*
         let message = RpcMessage::Request {
             id: 1,

@@ -1,7 +1,11 @@
-use crate::{
-    cli::Cli, constants::rpc::Command, contact::Contact, kademlia_id::KademliaID,
-    networking::Networking, routing_table::RoutingTable, utils,
+use {
+    crate::{
+        cli::Cli, constants::rpc::Command, contact::Contact, kademlia_id::KademliaID,
+        networking::Networking, routing_table::RoutingTable, utils,
+    },
+    tokio::sync::mpsc,
 };
+
 pub struct Kademlia {
     route_table: RoutingTable,
     cli: Cli,

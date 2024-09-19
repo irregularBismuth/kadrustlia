@@ -81,6 +81,13 @@ impl Networking {
 
                         println!("Sent PONG to {}", dest_cp);
                     }
+                    Command::PONG => {
+                        println!("Recived PONG from {} rpc id {} with params: {:?}",
+                        src,
+                        id.to_hex(),
+                        params
+                        );
+                    }
                     _ => {
                         println!("Received unexpected command from {}", src);
                     }

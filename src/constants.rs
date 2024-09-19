@@ -14,3 +14,5 @@ pub mod rpc {
         FINDVALUE,
     }
 }
+
+pub const ALL_IPV4: &str = "0.0.0.0";

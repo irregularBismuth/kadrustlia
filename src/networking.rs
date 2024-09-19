@@ -13,7 +13,7 @@ impl Networking {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         let ping_msg = cmd;
         let rpc_msg = RpcMessage::Request {
-            id: 1,
+            id: crate::kademlia_id::KademliaID::new(),
             method: ping_msg,
             params: vec!["alice".to_string()],
         };
@@ -30,7 +30,10 @@ impl Networking {
 
     pub async fn send_rpc_response(target_addr: &str, cmd: Command) -> tokio::io::Result<()> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
-        let rpc_msg = RpcMessage::Response { id: 2, result: cmd };
+        let rpc_msg = RpcMessage::Response {
+            id: crate::kademlia_id::KademliaID::new(),
+            result: cmd,
+        };
         let bin_data = bincode::serialize(&rpc_msg).expect("Failed to serialize response");
         let target = format!("{}:5678", target_addr);
         socket.send_to(&bin_data, &target).await?;
@@ -53,7 +56,12 @@ impl Networking {
             match received_msg {
                 RpcMessage::Request { id, method, params } => match method {
                     Command::PING => {
-                        println!("Received PING from {} with params: {:?}", src, params);
+                        println!(
+                            "Received PING from {} rpc id {} with params: {:?}",
+                            src,
+                            id.to_hex(),
+                            params
+                        );
                         let src_ip = src.ip().to_string();
                         let dest_cp = src_ip.clone();
                         tokio::spawn(async move {
@@ -69,10 +77,14 @@ impl Networking {
                     }
                 },
                 RpcMessage::Response { id, result } => {
-                    println!("Received Response with ID {} and result: {:?}", id, result);
+                    println!(
+                        "Received Response with ID {} and result: {:?}",
+                        id.to_hex(),
+                        result
+                    );
                 }
                 RpcMessage::Error { id, message } => {
-                    println!("Received Error with ID {}: {}", id, message);
+                    println!("Received Error with ID {}: {}", id.to_hex(), message);
                 }
             }
         }

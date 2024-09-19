@@ -17,9 +17,17 @@ pub fn boot_node_address() -> String {
 }
 
 pub fn get_own_address() -> String {
-    let output = process::Command::new("hostname")
-        .arg("-i")
-        .output()
-        .expect("failed to execute hostname command");
-    String::from_utf8(output.stdout).unwrap().trim().to_string()
+    #[cfg(feature = "local")]
+    {
+        "127.0.0.1".to_string()
+    }
+
+    #[cfg(not(feature = "local"))]
+    {
+        let output = process::Command::new("hostname")
+            .arg("-i")
+            .output()
+            .expect("failed to execute hostname command");
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    }
 }

@@ -1,8 +1,14 @@
 use {
     axum::{http::StatusCode, routing::get, Json, Router},
     kadrustlia::{
-        cli::Cli, constants::rpc::Command, contact::Contact, kademlia::Kademlia,
-        kademlia_id::KademliaID, networking::Networking, rpc::RpcMessage, utils,
+        cli::Cli,
+        constants::{rpc::Command, ALL_IPV4},
+        contact::Contact,
+        kademlia::Kademlia,
+        kademlia_id::KademliaID,
+        networking::Networking,
+        rpc::RpcMessage,
+        utils,
     },
     std::net::SocketAddr,
     std::sync::Arc,
@@ -16,9 +22,19 @@ async fn root() -> &'static str {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let bind_addr = "0.0.0.0:5678";
+    // REST interface ##################
     tokio::spawn(async move {
-        Networking::listen_for_rpc(bind_addr)
+        let app = Router::new().route("/", get(root));
+        let ip = format!("{}:{}", ALL_IPV4, "3000");
+        let listener = tokio::net::TcpListener::bind(ip).await.unwrap();
+        axum::serve(listener, app).await.unwrap();
+    });
+    //#################################
+
+    let bind_addr = format!("{}:{}", ALL_IPV4, "5678");
+
+    tokio::spawn(async move {
+        Networking::listen_for_rpc(&bind_addr)
             .await
             .expect("Failed to listen for PING");
     });
@@ -26,24 +42,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let kadid = KademliaID::new();
     let hex = kadid.to_hex();
     let kadid2 = KademliaID::from_hex(hex.clone());
-
     assert_eq!(kadid, kadid2);
-    // REST interface ##################
-    tokio::spawn(async move {
-        let app = Router::new().route("/", get(root));
-        let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-        axum::serve(listener, app).await.unwrap();
-    });
-    //#################################
-    Contact::contact_from_hex(hex, "127.0.0.1".to_string());
-
-    #[cfg(not(feature = "local"))]
-    {
-        println!("addr : {:?}", utils::get_own_address());
-    }
-
     let kademlia_instance = Arc::new(Mutex::new(Kademlia::new()));
-
     let kademlia_for_join = Arc::clone(&kademlia_instance);
     let kademlia_for_cli = Arc::clone(&kademlia_instance);
 

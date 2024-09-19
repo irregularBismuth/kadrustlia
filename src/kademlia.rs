@@ -10,15 +10,7 @@ pub struct Kademlia {
 impl Kademlia {
     pub fn new() -> Self {
         let kad_id = KademliaID::new();
-        let addr: String;
-        #[cfg(not(feature = "local"))]
-        {
-            addr = utils::get_own_address();
-        }
-        #[cfg(feature = "local")]
-        {
-            addr = "127.0.0.1".to_string();
-        }
+        let addr = utils::get_own_address();
         println!("my addr is {}", addr);
         let contact: Contact = Contact::new(kad_id, addr);
         Self {
@@ -35,16 +27,7 @@ impl Kademlia {
         if utils::check_bn() {
             return;
         }
-        let adr: String;
-
-        #[cfg(feature = "local")]
-        {
-            adr = "127.0.0.1".to_string(); //tils::boot_node_address();
-        }
-        #[cfg(not(feature = "local"))]
-        {
-            adr = utils::boot_node_address();
-        }
+        let adr: String = utils::boot_node_address();
         let boot_node_addr: String = format!("{}:{}", adr, "5678");
         println!("Boot node address: {}", boot_node_addr);
 

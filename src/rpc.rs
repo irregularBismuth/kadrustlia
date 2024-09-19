@@ -4,16 +4,16 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 pub enum RpcMessage {
     Request {
-        id: u64,
+        id: KademliaID,
         method: Command,
         params: Vec<String>,
     },
     Response {
-        id: u64,
+        id: KademliaID,
         result: Command,
     },
     Error {
-        id: u64,
+        id: KademliaID,
         message: String,
     },
 }

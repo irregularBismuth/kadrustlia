@@ -1,12 +1,13 @@
 use crate::constants::rpc::Command;
 use crate::kademlia_id::KademliaID;
 use serde::{Deserialize, Serialize};
+use crate::contact::Contact;
 #[derive(Serialize, Deserialize, Debug)]
 pub enum RpcMessage {
     Request {
         id: KademliaID,
         method: Command,
-        params: Vec<String>,
+        params: Vec<Contact>,
     },
     Response {
         id: KademliaID,

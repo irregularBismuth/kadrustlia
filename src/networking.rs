@@ -1,9 +1,7 @@
 use {
-    crate::{constants::rpc::Command, rpc::RpcMessage},
+    crate::{constants::rpc::Command, kademlia_id, rpc::RpcMessage, contact::Contact},
     bincode::{deserialize, serialize},
-    tokio::net::lookup_host,
-    tokio::net::ToSocketAddrs,
-    tokio::net::UdpSocket,
+    tokio::net::{lookup_host, ToSocketAddrs, UdpSocket},
 };
 
 pub struct Networking;
@@ -15,7 +13,7 @@ impl Networking {
         let rpc_msg = RpcMessage::Request {
             id: crate::kademlia_id::KademliaID::new(),
             method: ping_msg,
-            params: vec!["alice".to_string()],
+            params: vec![Contact::new(kademlia_id::KademliaID::new(), "127.0.0.1".to_string())],
         };
         for addr in lookup_host(target_addr).await? {
             println!("addr is {:?}", addr);

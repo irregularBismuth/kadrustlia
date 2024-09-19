@@ -10,7 +10,15 @@ pub struct Kademlia {
 impl Kademlia {
     pub fn new() -> Self {
         let kad_id = KademliaID::new();
-        let addr = utils::get_own_address();
+        let addr: String;
+        #[cfg(not(feature = "local"))]
+        {
+            addr = utils::get_own_address();
+        }
+        #[cfg(feature = "local")]
+        {
+            addr = "127.0.0.1".to_string();
+        }
         println!("my addr is {}", addr);
         let contact: Contact = Contact::new(kad_id, addr);
         Self {
@@ -18,15 +26,29 @@ impl Kademlia {
             cli: Cli::new(),
         }
     }
+
+    pub async fn listen(&mut self, addr: &str) {
+        Networking::listen_for_rpc(addr).await;
+    }
+
     pub async fn join(&mut self) {
         if utils::check_bn() {
             return;
         }
-        let boot_node_addr: String = utils::boot_node_address();
-        let boot_node_addr: String = format!("{}:{}", boot_node_addr, "5678");
+        let adr: String;
+
+        #[cfg(feature = "local")]
+        {
+            adr = "127.0.0.1".to_string(); //tils::boot_node_address();
+        }
+        #[cfg(not(feature = "local"))]
+        {
+            adr = utils::boot_node_address();
+        }
+        let boot_node_addr: String = format!("{}:{}", adr, "5678");
         println!("Boot node address: {}", boot_node_addr);
 
-        Networking::send_ping(&boot_node_addr, Command::PING)
+        Networking::send_rpc_request(&boot_node_addr, Command::PING)
             .await
             .expect("failed to send PING");
     }

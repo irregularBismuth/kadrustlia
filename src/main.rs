@@ -1,8 +1,8 @@
 use {
     axum::{http::StatusCode, routing::get, Json, Router},
     kadrustlia::{
-        cli::Cli, constants::rpc::Command, kademlia::Kademlia, networking::Networking,
-        rpc::RpcMessage, utils,
+        cli::Cli, constants::rpc::Command, contact::Contact, kademlia::Kademlia,
+        kademlia_id::KademliaID, networking::Networking, rpc::RpcMessage, utils,
     },
     std::net::SocketAddr,
     std::sync::Arc,
@@ -23,6 +23,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .expect("Failed to listen for PING");
     });
 
+    let kadid = KademliaID::new();
+    let hex = kadid.to_hex();
+    let kadid2 = KademliaID::from_hex(hex.clone());
+
+    assert_eq!(kadid, kadid2);
     // REST interface ##################
     tokio::spawn(async move {
         let app = Router::new().route("/", get(root));
@@ -30,8 +35,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         axum::serve(listener, app).await.unwrap();
     });
     //#################################
+    Contact::contact_from_hex(hex, "127.0.0.1".to_string());
 
-    println!("addr : {:?}", utils::get_own_address());
+    #[cfg(not(feature = "local"))]
+    {
+        println!("addr : {:?}", utils::get_own_address());
+    }
 
     let kademlia_instance = Arc::new(Mutex::new(Kademlia::new()));
 

@@ -9,7 +9,7 @@ use {
 pub struct Networking;
 
 impl Networking {
-    pub async fn send_ping(target_addr: &str, cmd: Command) -> std::io::Result<()> {
+    pub async fn send_rpc_request(target_addr: &str, cmd: Command) -> std::io::Result<()> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         let ping_msg = cmd;
         let rpc_msg = RpcMessage::Request {

@@ -20,6 +20,21 @@ impl KademliaID {
         Self { id }
     }
 
+    pub fn from_hex(hex: String) -> Self {
+        let id: KadId = hex
+            .as_bytes()
+            .chunks(2)
+            .map(|chunk| {
+                let high = (chunk[0] as char).to_digit(16).unwrap();
+                let low = (chunk[1] as char).to_digit(16).unwrap();
+                ((high << 4) | low) as u8
+            })
+            .collect::<Vec<u8>>()
+            .try_into()
+            .expect("invalid kademlia id ");
+        Self { id }
+    }
+
     pub fn with_id(id: KadId) -> Self {
         Self { id }
     }

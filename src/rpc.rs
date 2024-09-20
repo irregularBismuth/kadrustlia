@@ -1,7 +1,7 @@
 use crate::constants::rpc::Command;
+use crate::contact::Contact;
 use crate::kademlia_id::KademliaID;
 use serde::{Deserialize, Serialize};
-use crate::contact::Contact;
 #[derive(Serialize, Deserialize, Debug)]
 pub enum RpcMessage {
     Request {

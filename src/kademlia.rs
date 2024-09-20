@@ -45,7 +45,6 @@ impl Kademlia {
         println!("my addr is {}", addr);
         let contact: Contact = Contact::new(kad_id, addr);
         let (tx, rx) = mpsc::channel(32);
-
         let initial_contact = contact.clone();
         tokio::spawn(async move {
             let routing_table = RoutingTable::new(initial_contact);

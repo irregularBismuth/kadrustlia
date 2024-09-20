@@ -6,8 +6,35 @@ use {
     tokio::sync::mpsc,
 };
 
+pub enum RouteTableCMD {
+    AddContact(Contact),
+    RemoveContact(KademliaID),
+    GetClosestNodes(KademliaID),
+}
+
+async fn routing_table_handler(
+    mut rx: mpsc::Receiver<RouteTableCMD>,
+    mut routing_table: RoutingTable,
+) {
+    println!("route table handler");
+    while let Some(cmd) = rx.recv().await {
+        match cmd {
+            RouteTableCMD::AddContact(contact) => {
+                println!("ping  hello ");
+            }
+            RouteTableCMD::RemoveContact(kad_id) => {
+                println!("remove  coibntact");
+            }
+            RouteTableCMD::GetClosestNodes(kad_id) => {
+                println!("kademlia we got {}", kad_id.to_hex());
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Kademlia {
-    route_table: RoutingTable,
+    route_table_tx: mpsc::Sender<RouteTableCMD>,
     cli: Cli,
 }
 
@@ -17,17 +44,26 @@ impl Kademlia {
         let addr = utils::get_own_address();
         println!("my addr is {}", addr);
         let contact: Contact = Contact::new(kad_id, addr);
+        let (tx, rx) = mpsc::channel(32);
+
+        let initial_contact = contact.clone();
+        tokio::spawn(async move {
+            let routing_table = RoutingTable::new(initial_contact);
+            routing_table_handler(rx, routing_table).await;
+        });
+
         Self {
-            route_table: RoutingTable::new(contact),
             cli: Cli::new(),
+            route_table_tx: tx,
         }
     }
 
-    pub async fn listen(&mut self, addr: &str) {
-        Networking::listen_for_rpc(addr).await;
+    pub async fn listen(&self, addr: &str) {
+        let tx = self.route_table_tx.clone();
+        let _ = Networking::listen_for_rpc(tx, addr).await;
     }
 
-    pub async fn join(&mut self) {
+    pub async fn join(&self) {
         if utils::check_bn() {
             return;
         }
@@ -40,7 +76,7 @@ impl Kademlia {
             .expect("failed to send PING");
     }
 
-    pub async fn start_cli(&mut self) {
+    pub async fn start_cli(&self) {
         self.cli.read_input().await;
     }
 }

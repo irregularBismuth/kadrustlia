@@ -5,7 +5,7 @@ enum Command {
     PUT(String),
     EXIT,
 }
-
+#[derive(Clone)]
 pub struct Cli {}
 
 impl Cli {

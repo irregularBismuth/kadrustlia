@@ -32,30 +32,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //#################################
 
     let bind_addr = format!("{}:{}", ALL_IPV4, "5678");
-
+    /*
     tokio::spawn(async move {
         Networking::listen_for_rpc(&bind_addr)
             .await
             .expect("Failed to listen for PING");
-    });
+    }); */
 
     let kadid = KademliaID::new();
     let hex = kadid.to_hex();
     let kadid2 = KademliaID::from_hex(hex.clone());
-    assert_eq!(kadid, kadid2);
-    let kademlia_instance = Arc::new(Mutex::new(Kademlia::new()));
-    let kademlia_for_join = Arc::clone(&kademlia_instance);
-    let kademlia_for_cli = Arc::clone(&kademlia_instance);
 
-    tokio::join!(
-        async {
-            let mut instance = kademlia_for_join.lock().await;
-            instance.join().await;
-        },
-        async {
-            let mut instance = kademlia_for_cli.lock().await;
-            instance.start_cli().await;
-        }
-    );
+    assert_eq!(kadid, kadid2);
+
+    let kademlia = Kademlia::new();
+
+    let kademlia_c = kademlia.clone();
+    let listen_task = tokio::spawn(async move {
+        kademlia.listen(&bind_addr).await;
+    });
+    let join_task = tokio::spawn(async move {
+        kademlia_c.join().await;
+    });
+    let _ = tokio::join!(listen_task, join_task);
     Ok(())
 }

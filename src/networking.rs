@@ -1,7 +1,11 @@
 use {
-    crate::{constants::rpc::Command, kademlia_id, rpc::RpcMessage, contact::Contact},
+    crate::{
+        constants::rpc::Command, contact::Contact, kademlia::RouteTableCMD, kademlia_id,
+        rpc::RpcMessage,
+    },
     bincode::{deserialize, serialize},
     tokio::net::{lookup_host, ToSocketAddrs, UdpSocket},
+    tokio::sync::mpsc,
 };
 
 pub struct Networking;
@@ -13,7 +17,10 @@ impl Networking {
         let rpc_msg = RpcMessage::Request {
             id: crate::kademlia_id::KademliaID::new(),
             method: ping_msg,
-            params: vec![Contact::new(kademlia_id::KademliaID::new(), "127.0.0.1".to_string())],
+            params: vec![Contact::new(
+                kademlia_id::KademliaID::new(),
+                "127.0.0.1".to_string(),
+            )],
         };
         for addr in lookup_host(target_addr).await? {
             println!("addr is {:?}", addr);
@@ -39,7 +46,10 @@ impl Networking {
         Ok(())
     }
 
-    pub async fn listen_for_rpc(bind_addr: &str) -> std::io::Result<()> {
+    pub async fn listen_for_rpc(
+        mut tx: mpsc::Sender<RouteTableCMD>,
+        bind_addr: &str,
+    ) -> std::io::Result<()> {
         let socket = UdpSocket::bind(bind_addr).await?;
         println!("Listening for RPC messages on {}", bind_addr);
 
@@ -62,6 +72,7 @@ impl Networking {
                         );
                         let src_ip = src.ip().to_string();
                         let dest_cp = src_ip.clone();
+                        let _ = tx.send(RouteTableCMD::GetClosestNodes(id)).await;
                         tokio::spawn(async move {
                             Networking::send_rpc_response(&src_ip, Command::PONG)
                                 .await

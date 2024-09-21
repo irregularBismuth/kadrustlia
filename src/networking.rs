@@ -81,23 +81,52 @@ impl Networking {
 
                         println!("Sent PONG to {}", dest_cp);
                     }
-                    Command::PONG => {
-                        println!("Recived PONG from {} rpc id {} with params: {:?}",
-                        src,
-                        id.to_hex(),
-                        params
+                    Command::FINDNODE => {
+                        println!(
+                            "Received FINDNODE from {} rpc id {} with params: {:?}",
+                            src,
+                            id.to_hex(),
+                            params
+                        );
+                    }
+                    Command::FINDVALUE => {
+                        println!(
+                            "Received FINDVALUE from {} rpc id {} with params: {:?}",
+                            src,
+                            id.to_hex(),
+                            params
                         );
                     }
                     _ => {
                         println!("Received unexpected command from {}", src);
                     }
                 },
-                RpcMessage::Response { id, result } => {
-                    println!(
-                        "Received Response with ID {} and result: {:?}",
-                        id.to_hex(),
-                        result
-                    );
+                RpcMessage::Response { id, result } => match result {
+                    Command::PONG => {
+                        println!("Recived PONG from {} rpc id {}",
+                        src,
+                        id.to_hex()
+                        );
+                    }
+                    Command::FINDNODE => {
+                        println!("Recived FINDNODE from {} rpc id {}",
+                        src,
+                        id.to_hex()
+                        );
+                    }
+                    Command::FINDVALUE => {
+                        println!("Recived FINDVALUE from {} rpc id {}",
+                        src,
+                        id.to_hex()
+                        );
+                    }
+                    _ => {
+                        println!(
+                            "Received Response with ID {} and result: {:?}",
+                            id.to_hex(),
+                            result
+                        );
+                    }
                 }
                 RpcMessage::Error { id, message } => {
                     println!("Received Error with ID {}: {}", id.to_hex(), message);

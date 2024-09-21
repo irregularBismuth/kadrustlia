@@ -75,7 +75,34 @@ impl Kademlia {
             .expect("failed to send PING");
     }
 
+    pub async fn find_node() {
+
+    }
+
+    pub async fn find_value() {
+
+    }
+
     pub async fn start_cli(&self) {
         self.cli.read_input().await;
     }
 }
+
+
+/*
++-----------------+                   +-----------------+
+|                 |                   |                 |
+|     My Node     |                   |   Other Node    |
+|                 |                   |                 |
++-----------------+                   +-----------------+
+        |                                       |
+        | find_node(target_id)                  |
+        |-------------------------------------->|
+        |                               listen_for_rpc()
+        |                               Processes FIND_NODE request
+        |                               Accesses routing table
+        |<--------------------------------------|
+        | Receives response with contacts       |
+        | Processes response                    |
+
+*/

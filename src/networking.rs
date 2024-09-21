@@ -95,7 +95,7 @@ impl Networking {
                             src,
                             id.to_hex(),
                             params
-                        )
+                        );
                     }
                     _ => {
                         println!("Received unexpected command from {}", src);

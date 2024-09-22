@@ -72,11 +72,7 @@ impl Networking {
             match received_msg {
                 RpcMessage::Request { id, method, data, contact } => match method {
                     Command::PING => {
-                        println!("Recived {:?} from {} rpc id {}",
-                            method,
-                            src,
-                            id.to_hex()
-                        );
+                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
                         let src_ip = src.ip().to_string();
                         let dest_cp = src_ip.clone();
                         let _ = tx.send(RouteTableCMD::GetClosestNodes(id)).await;
@@ -89,25 +85,13 @@ impl Networking {
                         println!("Sent PONG to {}", dest_cp);
                     }
                     Command::FINDNODE => {
-                        println!("Recived {:?} from {} rpc id {}",
-                            method,
-                            src,
-                            id.to_hex()
-                        );
+                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
                     }
                     Command::FINDVALUE => {
-                        println!("Recived {:?} from {} rpc id {}",
-                            method,
-                            src,
-                            id.to_hex()
-                        );
+                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
                     }
                     Command::STORE => {
-                        println!("Recived {:?} from {} rpc id {}",
-                            method,
-                            src,
-                            id.to_hex()
-                        );
+                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
                     }
                     _ => {
                         println!("Received unexpected command from {}", src);
@@ -115,32 +99,16 @@ impl Networking {
                 },
                 RpcMessage::Response { id, result, data, contact} => match result {
                     Command::PONG => {
-                        println!("Recived {:?} from {} rpc id {}",
-                            result,
-                            src,
-                            id.to_hex()
-                        );
+                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
                     }
                     Command::FINDNODE => {
-                        println!("Recived {:?} from {} rpc id {}",
-                            result,
-                            src,
-                            id.to_hex()
-                        );
+                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
                     }
                     Command::FINDVALUE => {
-                        println!("Recived {:?} from {} rpc id {}",
-                            result,
-                            src,
-                            id.to_hex()
-                        );
+                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
                     }
                     Command::STORE => {
-                        println!("Recived {:?} from {} rpc id {}",
-                            result,
-                            src,
-                            id.to_hex()
-                        );
+                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
                     }
                     _ => {
                         println!(
@@ -149,7 +117,7 @@ impl Networking {
                             result
                         );
                     }
-                }
+                },
                 RpcMessage::Error { id, message } => {
                     println!("Received Error with ID {}: {}", id.to_hex(), message);
                 }

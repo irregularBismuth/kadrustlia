@@ -1,6 +1,6 @@
 use {
     crate::{
-        constants::rpc::Command, contact::Contact, kademlia::RouteTableCMD, kademlia_id,
+        constants::rpc::Command, contact::Contact, kademlia::RouteTableCMD, kademlia_id::KademliaID,
         rpc::RpcMessage,
     },
     bincode::{deserialize, serialize},
@@ -11,38 +11,46 @@ use {
 pub struct Networking;
 
 impl Networking {
-    pub async fn send_rpc_request(target_addr: &str, cmd: Command) -> std::io::Result<()> {
+    pub async fn send_rpc_request(
+        target_addr: &str,
+        cmd: Command,
+        data: Option<String>,
+        contact: Option<Vec<Contact>>,
+    ) -> std::io::Result<()> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
-        let ping_msg = cmd;
         let rpc_msg = RpcMessage::Request {
-            id: crate::kademlia_id::KademliaID::new(),
-            method: ping_msg,
-            params: vec![Contact::new(
-                kademlia_id::KademliaID::new(),
-                "127.0.0.1".to_string(),
-            )],
+            id: KademliaID::new(),
+            method: cmd,
+            data,
+            contact,
         };
         for addr in lookup_host(target_addr).await? {
-            println!("addr is {:?}", addr);
-            let address = addr;
             let bin_data = bincode::serialize(&rpc_msg).expect("failed to serialize data");
-            socket.send_to(&bin_data, &address).await?;
-            println!("Sent PING to {}", &address);
+            socket.send_to(&bin_data, &addr).await?;
+            println!("Sent {:?} to {}", cmd, &addr);
             break;
         }
         Ok(())
     }
 
-    pub async fn send_rpc_response(target_addr: &str, cmd: Command) -> tokio::io::Result<()> {
+    pub async fn send_rpc_response(
+        target_addr: &str,
+        cmd: Command,
+        id: KademliaID,
+        data: Option<String>,
+        contact: Option<Vec<Contact>>,
+    ) -> tokio::io::Result<()> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         let rpc_msg = RpcMessage::Response {
-            id: crate::kademlia_id::KademliaID::new(),
+            id,
             result: cmd,
+            data,
+            contact,
         };
         let bin_data = bincode::serialize(&rpc_msg).expect("Failed to serialize response");
         let target = format!("{}:5678", target_addr);
         socket.send_to(&bin_data, &target).await?;
-        println!("Sent response (PONG or other) to {}", target);
+        println!("Sent response ({:?}) to {}", cmd, target);
         Ok(())
     }
 
@@ -62,19 +70,14 @@ impl Networking {
                 bincode::deserialize(&buf[..len]).expect("failed to deserialize data");
 
             match received_msg {
-                RpcMessage::Request { id, method, params } => match method {
+                RpcMessage::Request { id, method, data, contact } => match method {
                     Command::PING => {
-                        println!(
-                            "Received PING from {} rpc id {} with params: {:?}",
-                            src,
-                            id.to_hex(),
-                            params
-                        );
+                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
                         let src_ip = src.ip().to_string();
                         let dest_cp = src_ip.clone();
                         let _ = tx.send(RouteTableCMD::GetClosestNodes(id)).await;
                         tokio::spawn(async move {
-                            Networking::send_rpc_response(&src_ip, Command::PONG)
+                            Networking::send_rpc_response(&src_ip, Command::PONG, id, None, None)
                                 .await
                                 .expect("no response was sent");
                         });
@@ -82,34 +85,30 @@ impl Networking {
                         println!("Sent PONG to {}", dest_cp);
                     }
                     Command::FINDNODE => {
-                        println!(
-                            "Received FINDNODE from {} rpc id {} with params: {:?}",
-                            src,
-                            id.to_hex(),
-                            params
-                        );
+                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
                     }
                     Command::FINDVALUE => {
-                        println!(
-                            "Received FINDVALUE from {} rpc id {} with params: {:?}",
-                            src,
-                            id.to_hex(),
-                            params
-                        );
+                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+                    }
+                    Command::STORE => {
+                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
                     }
                     _ => {
                         println!("Received unexpected command from {}", src);
                     }
                 },
-                RpcMessage::Response { id, result } => match result {
+                RpcMessage::Response { id, result, data, contact} => match result {
                     Command::PONG => {
-                        println!("Recived PONG from {} rpc id {}", src, id.to_hex());
+                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
                     }
                     Command::FINDNODE => {
-                        println!("Recived FINDNODE from {} rpc id {}", src, id.to_hex());
+                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
                     }
                     Command::FINDVALUE => {
-                        println!("Recived FINDVALUE from {} rpc id {}", src, id.to_hex());
+                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+                    }
+                    Command::STORE => {
+                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
                     }
                     _ => {
                         println!(

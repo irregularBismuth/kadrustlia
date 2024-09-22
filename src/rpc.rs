@@ -7,11 +7,14 @@ pub enum RpcMessage {
     Request {
         id: KademliaID,
         method: Command,
-        params: Vec<Contact>,
+        data: Option<String>,
+        contact: Option<Vec<Contact>>,
     },
     Response {
         id: KademliaID,
         result: Command,
+        data: Option<String>,
+        contact: Option<Vec<Contact>>,
     },
     Error {
         id: KademliaID,

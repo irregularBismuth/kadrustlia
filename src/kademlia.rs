@@ -70,17 +70,21 @@ impl Kademlia {
         let boot_node_addr: String = format!("{}:{}", adr, "5678");
         println!("Boot node address: {}", boot_node_addr);
 
-        Networking::send_rpc_request(&boot_node_addr, Command::PING)
+        Networking::send_rpc_request(&boot_node_addr, Command::PING, None, None)
             .await
             .expect("failed to send PING");
     }
 
-    pub async fn find_node() {
-
+    pub async fn find_node(self, target_id: KademliaID) -> std::io::Result<()> {
+        Ok(())
     }
 
-    pub async fn find_value() {
+    pub async fn find_value(self, target_id: KademliaID) -> std::io::Result<()> {
+        Ok(())
+    }
 
+    pub async fn store(self, target_id: KademliaID) -> std::io::Result<()> {
+        Ok(())
     }
 
     pub async fn start_cli(&self) {

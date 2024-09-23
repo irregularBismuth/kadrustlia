@@ -103,22 +103,13 @@ impl Networking {
                 },
                 RpcMessage::Response { id, result } => match result {
                     Command::PONG => {
-                        println!("Recived PONG from {} rpc id {}",
-                        src,
-                        id.to_hex()
-                        );
+                        println!("Recived PONG from {} rpc id {}", src, id.to_hex());
                     }
                     Command::FINDNODE => {
-                        println!("Recived FINDNODE from {} rpc id {}",
-                        src,
-                        id.to_hex()
-                        );
+                        println!("Recived FINDNODE from {} rpc id {}", src, id.to_hex());
                     }
                     Command::FINDVALUE => {
-                        println!("Recived FINDVALUE from {} rpc id {}",
-                        src,
-                        id.to_hex()
-                        );
+                        println!("Recived FINDVALUE from {} rpc id {}", src, id.to_hex());
                     }
                     _ => {
                         println!(
@@ -127,7 +118,7 @@ impl Networking {
                             result
                         );
                     }
-                }
+                },
                 RpcMessage::Error { id, message } => {
                     println!("Received Error with ID {}: {}", id.to_hex(), message);
                 }

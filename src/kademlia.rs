@@ -1,81 +1,115 @@
-use proto::kademlia_server::{Kademlia, KademliaServer};
-use proto::{
-    LookupContactRequest, LookupContactResponse, LookupDataRequest, LookupDataResponse, Node,
-    StoreRequest, StoreResponse,
+use {
+    crate::{
+        cli::Cli, constants::rpc::Command, contact::Contact, kademlia_id::KademliaID,
+        networking::Networking, routing_table::RoutingTable, utils,
+    },
+    tokio::sync::mpsc,
 };
-use std::net::SocketAddr;
-use tonic::{transport::Server, Request, Response, Status};
 
-pub mod proto {
-    tonic::include_proto!("kademlia");
+pub enum RouteTableCMD {
+    AddContact(Contact),
+    RemoveContact(KademliaID),
+    GetClosestNodes(KademliaID),
 }
 
-#[derive(Debug, Default)]
-pub struct KademliaService;
-
-#[tonic::async_trait]
-impl Kademlia for KademliaService {
-    async fn lookup_contact(
-        &self,
-        request: Request<LookupContactRequest>,
-    ) -> Result<Response<LookupContactResponse>, Status> {
-        let req = request.into_inner();
-        println!(
-            "LookupContact request received for contact_id={}",
-            req.contact_id
-        );
-
-        let nodes = vec![
-            Node {
-                node_id: "123".to_string(),
-                address: "192.168.1.1:5678".to_string(),
-            },
-            Node {
-                node_id: "456".to_string(),
-                address: "192.168.1.2:5678".to_string(),
-            },
-        ];
-
-        let reply = LookupContactResponse { nodes };
-        Ok(Response::new(reply))
-    }
-
-    async fn lookup_data(
-        &self,
-        request: Request<LookupDataRequest>,
-    ) -> Result<Response<LookupDataResponse>, Status> {
-        let req = request.into_inner();
-        println!("LookupData request received for hash={}", req.hash);
-
-        let data = "data".to_string();
-
-        let reply = LookupDataResponse { data };
-        Ok(Response::new(reply))
-    }
-
-    async fn store(
-        &self,
-        request: Request<StoreRequest>,
-    ) -> Result<Response<StoreResponse>, Status> {
-        let req = request.into_inner();
-        println!("Store request received with data size={}", req.data.len());
-
-        let success = true;
-
-        let reply = StoreResponse { success };
-        Ok(Response::new(reply))
+async fn routing_table_handler(
+    mut rx: mpsc::Receiver<RouteTableCMD>,
+    mut routing_table: RoutingTable,
+) {
+    println!("route table handler");
+    while let Some(cmd) = rx.recv().await {
+        match cmd {
+            RouteTableCMD::AddContact(contact) => {
+                println!("ping  hello ");
+            }
+            RouteTableCMD::RemoveContact(kad_id) => {
+                println!("remove  coibntact");
+            }
+            RouteTableCMD::GetClosestNodes(kad_id) => {
+                println!("kademlia we got {}", kad_id.to_hex());
+            }
+        }
     }
 }
 
-pub async fn start_server(addr: &SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
-    let kad = KademliaService::default();
-
-    println!("Starting server...");
-
-    Server::builder()
-        .add_service(KademliaServer::new(kad))
-        .serve(*addr)
-        .await?;
-
-    Ok(())
+#[derive(Clone)]
+pub struct Kademlia {
+    route_table_tx: mpsc::Sender<RouteTableCMD>,
+    cli: Cli,
 }
+
+impl Kademlia {
+    pub fn new() -> Self {
+        let kad_id = KademliaID::new();
+        let addr = utils::get_own_address();
+        println!("my addr is {}", addr);
+        let contact: Contact = Contact::new(kad_id, addr);
+        let (tx, rx) = mpsc::channel(32);
+        let initial_contact = contact.clone();
+        tokio::spawn(async move {
+            let routing_table = RoutingTable::new(initial_contact);
+            routing_table_handler(rx, routing_table).await;
+        });
+
+        Self {
+            cli: Cli::new(),
+            route_table_tx: tx,
+        }
+    }
+
+    pub async fn listen(&self, addr: &str) {
+        let tx = self.route_table_tx.clone();
+        let _ = Networking::listen_for_rpc(tx, addr).await;
+    }
+
+    pub async fn join(&self) {
+        if utils::check_bn() {
+            return;
+        }
+        let adr: String = utils::boot_node_address();
+        let boot_node_addr: String = format!("{}:{}", adr, "5678");
+        println!("Boot node address: {}", boot_node_addr);
+
+        Networking::send_rpc_request(&boot_node_addr, Command::PING, None, None)
+            .await
+            .expect("failed to send PING");
+    }
+
+    pub async fn find_node(self, target_id: KademliaID) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    pub async fn find_value(self, target_id: KademliaID) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    pub async fn store(self, data: String) -> std::io::Result<()> {
+        let mut kad_id = KademliaID::new();
+        kad_id.store_data(data.clone()).await;
+        println!("Data stored with kademlia id: {}", kad_id.to_hex());
+
+        Ok(())
+    }
+
+    pub async fn start_cli(&self) {
+        self.cli.read_input().await;
+    }
+}
+
+/*
++-----------------+                   +-----------------+
+|                 |                   |                 |
+|     My Node     |                   |   Other Node    |
+|                 |                   |                 |
++-----------------+                   +-----------------+
+        |                                       |
+        | find_node(target_id)                  |
+        |-------------------------------------->|
+        |                               listen_for_rpc()
+        |                               Processes FIND_NODE request
+        |                               Accesses routing table
+        |<--------------------------------------|
+        | Receives response with contacts       |
+        | Processes response                    |
+
+*/

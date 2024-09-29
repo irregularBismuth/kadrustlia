@@ -1,6 +1,8 @@
 use crate::contact::Contact;
 use crate::kademlia_id::KademliaID;
 use std::collections::LinkedList;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Clone)]
 pub struct Bucket {

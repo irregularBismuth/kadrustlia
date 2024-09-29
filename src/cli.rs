@@ -1,12 +1,13 @@
 use ::tokio::io::{self, AsyncBufReadExt, AsyncWriteExt};
-use crate::client::Client;
+
+use crate::kademlia::{self, Kademlia};
 
 enum Command {
     GET(String),
     PUT(String),
     EXIT,
 }
-
+#[derive(Clone)]
 pub struct Cli {}
 
 impl Cli {
@@ -14,7 +15,7 @@ impl Cli {
         Cli {}
     }
 
-    pub async fn read_input(&self, client: &mut Client) {
+    pub async fn read_input(&self) {
         let stdin = io::stdin();
         let mut reader = io::BufReader::new(stdin).lines();
 
@@ -30,7 +31,7 @@ impl Cli {
                             println!("bombaclat node");
                             break;
                         }
-                        self.execute_command(command, client).await;
+                        self.execute_command(command).await;
                     }
                     Err(e) => {
                         println!("Error: {}", e);
@@ -40,14 +41,18 @@ impl Cli {
         }
     }
 
-    async fn execute_command(&self, cmd: Command, client: &mut Client) {
+    async fn execute_command(&self, cmd: Command) {
         match cmd {
             Command::GET(hash) => {
-                client.lookup_data(hash).await.unwrap();
+                //.lookup_data(hash).await.unwrap();
+                println!("get ");
             }
             Command::PUT(data) => {
-                let data = data.as_bytes().to_vec();
-                client.store(data).await.unwrap();
+                let kademlia = Kademlia::new();
+                kademlia.store(data).await.unwrap();
+
+                // let data = data.as_bytes().to_vec();
+                //client.store(data).await.unwrap();
             }
             Command::EXIT => {
                 println!("Exiting...");

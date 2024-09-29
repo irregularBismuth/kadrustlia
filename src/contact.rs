@@ -1,8 +1,7 @@
 use crate::kademlia_id::KademliaID;
 use std::cmp::Ordering;
-
-#[derive(Clone)]
-
+use serde::{Deserialize,Serialize};
+#[derive(Serialize,Deserialize,Clone,Debug)]
 pub struct Contact {
     pub id: KademliaID,
     address: String,
@@ -15,6 +14,14 @@ impl Contact {
     pub fn new(id: KademliaID, address: String) -> Self {
         Self {
             id,
+            address,
+            distance: None,
+        }
+    }
+
+    pub fn contact_from_hex(hex: String, address: String) -> Self {
+        Self {
+            id: KademliaID::from_hex(hex),
             address,
             distance: None,
         }

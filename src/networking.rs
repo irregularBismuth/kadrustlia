@@ -117,6 +117,25 @@ impl Networking {
                             src,
                             id.to_hex()
                         );
+                        if let Some(data) = data {
+                            let mut kad_id = KademliaID::new();
+                            kad_id.store_data(data).await;
+
+                            let src_ip = src.ip().to_string();
+                            tokio::spawn(async move {
+                                Networking::send_rpc_response(
+                                    &src_ip,
+                                    Command::STORE,
+                                    kad_id,
+                                    None,
+                                    None,
+                                )
+                                .await
+                                .expect("Failed to send STORE response");
+                            });
+                        } else {
+                            println!("STORE request missing data");
+                        }
                     }
                     _ => {
                         println!("Received unexpected command from {}", src);

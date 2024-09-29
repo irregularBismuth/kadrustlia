@@ -22,10 +22,16 @@ mod tests {
         */
     }
 
-    #[test]
-    fn hash_data() {
-        let kad_id = KademliaID::new().store_data("test".to_string()).to_hex();
-        let kad_id2 = KademliaID::new().store_data("test".to_string()).to_hex();
+    #[tokio::test]
+    async fn hash_data() {
+        let kad_id = KademliaID::new()
+            .store_data("test".to_string())
+            .await
+            .to_hex();
+        let kad_id2 = KademliaID::new()
+            .store_data("test".to_string())
+            .await
+            .to_hex();
         assert_eq!(kad_id, kad_id2, "Don't have same hash");
     }
 }

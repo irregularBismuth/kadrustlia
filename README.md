@@ -46,3 +46,8 @@ docker ps -a
 docker exec -it kadrustlia-kademliaNodes-1 /bin/sh
 ```
 
+## CLI
+
+```sh
+docker attach <container_id>
+```

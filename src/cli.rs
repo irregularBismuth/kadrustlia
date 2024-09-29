@@ -1,5 +1,7 @@
 use ::tokio::io::{self, AsyncBufReadExt, AsyncWriteExt};
 
+use crate::kademlia::{self, Kademlia};
+
 enum Command {
     GET(String),
     PUT(String),
@@ -46,7 +48,9 @@ impl Cli {
                 println!("get ");
             }
             Command::PUT(data) => {
-                println!("thingy");
+                let kademlia = Kademlia::new();
+                kademlia.store(data).await.unwrap();
+
                 // let data = data.as_bytes().to_vec();
                 //client.store(data).await.unwrap();
             }

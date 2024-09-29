@@ -35,12 +35,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let kademlia = Kademlia::new();
     let kademlia_c = kademlia.clone();
+    let kademlia_c2 = kademlia.clone();
     let listen_task = tokio::spawn(async move {
         kademlia.listen(&bind_addr).await;
     });
     let join_task = tokio::spawn(async move {
         kademlia_c.join().await;
     });
-    let _ = tokio::join!(listen_task, join_task);
+    let join_task_2 = tokio::spawn(async move {
+        kademlia_c2.start_cli().await;
+    });
+    let _ = tokio::join!(listen_task, join_task, join_task_2);
     Ok(())
 }

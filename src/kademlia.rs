@@ -83,7 +83,11 @@ impl Kademlia {
         Ok(())
     }
 
-    pub async fn store(self, target_id: KademliaID) -> std::io::Result<()> {
+    pub async fn store(self, data: String) -> std::io::Result<()> {
+        let mut kad_id = KademliaID::new();
+        kad_id.store_data(data.clone()).await;
+        println!("Data stored with kademlia id: {}", kad_id.to_hex());
+
         Ok(())
     }
 
@@ -91,7 +95,6 @@ impl Kademlia {
         self.cli.read_input().await;
     }
 }
-
 
 /*
 +-----------------+                   +-----------------+

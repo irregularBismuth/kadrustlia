@@ -1,7 +1,7 @@
 use {
     crate::{
-        constants::rpc::Command, contact::Contact, kademlia::RouteTableCMD, kademlia_id::KademliaID,
-        rpc::RpcMessage,
+        constants::rpc::Command, contact::Contact, kademlia::RouteTableCMD,
+        kademlia_id::KademliaID, rpc::RpcMessage,
     },
     bincode::{deserialize, serialize},
     tokio::net::{lookup_host, ToSocketAddrs, UdpSocket},
@@ -70,9 +70,19 @@ impl Networking {
                 bincode::deserialize(&buf[..len]).expect("failed to deserialize data");
 
             match received_msg {
-                RpcMessage::Request { id, method, data, contact } => match method {
+                RpcMessage::Request {
+                    id,
+                    method,
+                    data,
+                    contact,
+                } => match method {
                     Command::PING => {
-                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Request from {} rpc id {}",
+                            method,
+                            src,
+                            id.to_hex()
+                        );
                         let src_ip = src.ip().to_string();
                         let dest_cp = src_ip.clone();
                         let _ = tx.send(RouteTableCMD::GetClosestNodes(id)).await;
@@ -85,30 +95,89 @@ impl Networking {
                         println!("Sent PONG to {}", dest_cp);
                     }
                     Command::FINDNODE => {
-                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Request from {} rpc id {}",
+                            method,
+                            src,
+                            id.to_hex()
+                        );
                     }
                     Command::FINDVALUE => {
-                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Request from {} rpc id {}",
+                            method,
+                            src,
+                            id.to_hex()
+                        );
                     }
                     Command::STORE => {
-                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Request from {} rpc id {}",
+                            method,
+                            src,
+                            id.to_hex()
+                        );
+                        if let Some(data) = data {
+                            let mut kad_id = KademliaID::new();
+                            kad_id.store_data(data).await;
+
+                            let src_ip = src.ip().to_string();
+                            tokio::spawn(async move {
+                                Networking::send_rpc_response(
+                                    &src_ip,
+                                    Command::STORE,
+                                    kad_id,
+                                    None,
+                                    None,
+                                )
+                                .await
+                                .expect("Failed to send STORE response");
+                            });
+                        } else {
+                            println!("STORE request missing data");
+                        }
                     }
                     _ => {
                         println!("Received unexpected command from {}", src);
                     }
                 },
-                RpcMessage::Response { id, result, data, contact} => match result {
+                RpcMessage::Response {
+                    id,
+                    result,
+                    data,
+                    contact,
+                } => match result {
                     Command::PONG => {
-                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Response from {} rpc id {}",
+                            result,
+                            src,
+                            id.to_hex()
+                        );
                     }
                     Command::FINDNODE => {
-                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Response from {} rpc id {}",
+                            result,
+                            src,
+                            id.to_hex()
+                        );
                     }
                     Command::FINDVALUE => {
-                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Response from {} rpc id {}",
+                            result,
+                            src,
+                            id.to_hex()
+                        );
                     }
                     Command::STORE => {
-                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Response from {} rpc id {}",
+                            result,
+                            src,
+                            id.to_hex()
+                        );
                     }
                     _ => {
                         println!(

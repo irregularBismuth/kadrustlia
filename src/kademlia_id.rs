@@ -4,6 +4,7 @@ use {
     serde::{Deserialize, Serialize},
     sha2::{Digest, Sha256},
     std::cmp::*,
+    tokio::fs,
 };
 
 type KadId = [u8; ID_LENGTH];
@@ -39,9 +40,31 @@ impl KademliaID {
         Self { id }
     }
 
-    pub fn store_data(&mut self, data: String) -> Self {
+    pub async fn store_data(&mut self, data: String) -> Self {
         let hash = Sha256::digest(data.as_bytes());
         self.id.copy_from_slice(&hash[..ID_LENGTH]);
+
+        let dir = "data";
+        let filename = format!("{}/{}.txt", dir, self.to_hex());
+
+        match fs::create_dir_all(dir).await {
+            Ok(_) => {
+                eprintln!("Directory '{}' created or already exists", dir);
+            }
+            Err(e) => {
+                eprintln!("Failed to create directory '{}': {}", dir, e);
+            }
+        }
+
+        match fs::write(&filename, data).await {
+            Ok(_) => {
+                eprintln!("Data successfully stored in file: {}", filename);
+            }
+            Err(e) => {
+                eprintln!("Failed to store data in '{}': {}", filename, e);
+            }
+        }
+
         *self
     }
 

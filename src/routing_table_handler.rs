@@ -1,3 +1,7 @@
+use tokio::sync::mpsc;
+
+use crate::{contact::Contact, kademlia_id::KademliaID, routing_table::RoutingTable};
+
 pub enum RouteTableCMD {
     AddContact(Contact),
     RemoveContact(KademliaID),

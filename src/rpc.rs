@@ -7,6 +7,7 @@ pub enum RpcMessage {
     Request {
         id: KademliaID,
         method: Command,
+        target_id: Option<KademliaID>,
         data: Option<String>,
         contact: Option<Vec<Contact>>,
     },

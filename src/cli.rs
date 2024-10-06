@@ -1,6 +1,6 @@
 use ::tokio::io::{self, AsyncBufReadExt, AsyncWriteExt};
 
-use crate::kademlia::{self, Kademlia};
+use crate::{kademlia::{self, Kademlia}, kademlia_id::KademliaID};
 
 enum Command {
     GET(String),
@@ -44,8 +44,9 @@ impl Cli {
     async fn execute_command(&self, cmd: Command) {
         match cmd {
             Command::GET(hash) => {
-                //.lookup_data(hash).await.unwrap();
-                println!("get ");
+                let target_id = KademliaID::from_hex(hash);
+                let kademlia = Kademlia::new();
+                kademlia.find_value(target_id).await.unwrap();
             }
             Command::PUT(data) => {
                 let kademlia = Kademlia::new();

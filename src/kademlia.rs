@@ -1,6 +1,6 @@
 use {
     crate::{
-        cli::Cli, constants::rpc::Command, contact::Contact, kademlia_id::KademliaID,
+        cli::Cli, constants::{rpc::Command, BUCKET_SIZE}, contact::Contact, kademlia_id::KademliaID,
         networking::Networking, routing_table::RoutingTable, utils,
     },
     tokio::sync::mpsc,
@@ -9,7 +9,7 @@ use {
 pub enum RouteTableCMD {
     AddContact(Contact),
     RemoveContact(KademliaID),
-    GetClosestNodes(KademliaID),
+    GetClosestNodes(KademliaID, mpsc::Sender<Vec<Contact>>),
 }
 
 async fn routing_table_handler(
@@ -25,8 +25,9 @@ async fn routing_table_handler(
             RouteTableCMD::RemoveContact(kad_id) => {
                 println!("remove  coibntact");
             }
-            RouteTableCMD::GetClosestNodes(kad_id) => {
-                println!("kademlia we got {}", kad_id.to_hex());
+            RouteTableCMD::GetClosestNodes(target_id, reply) => {
+                let contacts = routing_table.find_closest_contacts(target_id, BUCKET_SIZE);
+                let _ = reply.send(contacts).await;
             }
         }
     }
@@ -70,16 +71,22 @@ impl Kademlia {
         let boot_node_addr: String = format!("{}:{}", adr, "5678");
         println!("Boot node address: {}", boot_node_addr);
 
-        Networking::send_rpc_request(&boot_node_addr, Command::PING, None, None)
+        Networking::send_rpc_request(&boot_node_addr, Command::PING, None, None, None)
             .await
             .expect("failed to send PING");
     }
 
     pub async fn find_node(self, target_id: KademliaID) -> std::io::Result<()> {
+        
+
         Ok(())
     }
 
     pub async fn find_value(self, target_id: KademliaID) -> std::io::Result<()> {
+
+        println!("ben");
+        //Networking::send_rpc_request(target_addr, cmd, data, contact);
+
         Ok(())
     }
 

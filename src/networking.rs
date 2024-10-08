@@ -112,6 +112,45 @@ impl Networking {
                     }
                     Command::FINDVALUE => {
                         println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+
+                        if let Some(target_id) = target_id {
+                            let dir = "data";
+                            let filename = format!("{}/{}.txt", dir, target_id.to_hex());
+
+                            if let Ok(data) = tokio::fs::read_to_string(&filename).await {
+                                let src_ip = src.to_string();
+                                Networking::send_rpc_response(
+                                    &src_ip,
+                                    Command::FINDVALUE,
+                                    id,
+                                    Some(data),
+                                    None,
+                                )
+                                .await?;
+                            } else {
+                                let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
+
+                                let _ = tx
+                                    .send(RouteTableCMD::GetClosestNodes(target_id, reply_tx))
+                                    .await;
+
+                                if let Some(contacts) = reply_rx.recv().await {
+                                    let src_ip = src.to_string();
+                                    Networking::send_rpc_response(
+                                        &src_ip,
+                                        Command::FINDVALUE,
+                                        id,
+                                        None,
+                                        Some(contacts),
+                                    )
+                                    .await?;
+                                } else {
+                                    println!("no contacts from routing table");
+                                }
+                            }
+                        } else {
+                            println!("{:?} request missing target_id", method);
+                        }
                     }
                     Command::STORE => {
                         println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
@@ -161,6 +200,16 @@ impl Networking {
                     }
                     Command::FINDVALUE => {
                         println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+
+                        if let Some(value) = data {
+                            println!("value found: {}", value);
+                        } else if let Some(contacts) = contact {
+                            for contact in &contacts {
+                                let _ = tx.send(RouteTableCMD::AddContact(contact.clone())).await;
+                            }
+                        } else {
+                            println!("{:?} response missing data and contacts", result);
+                        }
                     }
                     Command::STORE => {
                         println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());

@@ -16,7 +16,7 @@ pub async fn routing_table_handler(
     while let Some(cmd) = rx.recv().await {
         match cmd {
             RouteTableCMD::AddContact(contact) => {
-                println!("ping  hello ");
+                routing_table.add_contact(contact);
             }
             RouteTableCMD::RemoveContact(kad_id) => {
                 println!("remove  coibntact");

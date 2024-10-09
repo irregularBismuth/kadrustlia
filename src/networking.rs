@@ -83,6 +83,9 @@ impl Networking {
                         println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
                         let src_ip = src.ip().to_string();
                         let dest_cp = src_ip.clone();
+                        let dest_cp_cp = src_ip.clone();
+
+                        let _ = tx.send(RouteTableCMD::AddContact(Contact::new(id, dest_cp))).await;
                         //let _ = tx.send(RouteTableCMD::GetClosestNodes(id)).await;
                         tokio::spawn(async move {
                             Networking::send_rpc_response(&src_ip, Command::PONG, id, None, None)
@@ -90,10 +93,14 @@ impl Networking {
                                 .expect("no response was sent");
                         });
 
-                        println!("Sent PONG to {}", dest_cp);
+                        println!("Sent PONG to {}", dest_cp_cp);
                     }
                     Command::FINDNODE => {
                         println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+
+                        //let Some(data) = target;
+
+                        //let target = KademliaID::from_hex(data.expect("expected valid hex string"));
 
                         if let Some(target_id) = target_id {
                             let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);

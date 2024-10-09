@@ -20,13 +20,17 @@ async fn routing_table_handler(
     while let Some(cmd) = rx.recv().await {
         match cmd {
             RouteTableCMD::AddContact(contact) => {
+                let kad_id = contact.id.clone();
                 routing_table.add_contact(contact);
+                println!("{:?}", routing_table.find_closest_contacts(kad_id, 5));
             }
             RouteTableCMD::RemoveContact(kad_id) => {
                 println!("remove  coibntact");
             }
             RouteTableCMD::GetClosestNodes(target_id, reply) => {
                 let contacts = routing_table.find_closest_contacts(target_id, BUCKET_SIZE);
+                println!("target_id: {:?}", target_id);
+                println!("contacts: {:?}", contacts);
                 let _ = reply.send(contacts).await;
             }
         }
@@ -74,6 +78,10 @@ impl Kademlia {
         Networking::send_rpc_request(&boot_node_addr, Command::PING, None, None, None)
             .await
             .expect("failed to send PING");
+
+
+        let target_id = KademliaID::new();
+        Networking::send_rpc_request(&boot_node_addr, Command::FINDVALUE, Some(target_id), None, None).await.expect("failed");
     }
 
     pub async fn find_node(self, target_id: KademliaID) -> std::io::Result<()> {

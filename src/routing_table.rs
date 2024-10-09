@@ -50,6 +50,15 @@ impl RoutingTable {
         }
     }
 
+    pub fn remove_contact(&mut self, kad_id: KademliaID) {
+        let bucket_index = self.get_bucket_index(kad_id.clone());
+
+        // Check if the bucket exists and then try to remove the contact
+        if let Some(bucket) = &mut self.buckets[bucket_index] {
+            bucket.remove_contact(kad_id); // You will also implement this in the Bucket struct
+        }
+    }
+
     pub fn find_closest_contacts(&mut self, target: KademliaID, count: usize) -> Vec<Contact> {
         let mut candidates = ContactCandidates::new();
         let bucket_index = self.get_bucket_index(target);

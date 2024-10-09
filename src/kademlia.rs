@@ -1,7 +1,7 @@
 use {
     crate::{
         cli::Cli,
-        constants::{rpc::Command, BUCKET_SIZE},
+        constants::{rpc::Command, ALPHA, BUCKET_SIZE},
         contact::Contact,
         kademlia_id::KademliaID,
         networking::Networking,
@@ -9,6 +9,7 @@ use {
         routing_table_handler::*,
         utils,
     },
+    futures::future::join_all,
     tokio::sync::mpsc,
 };
 
@@ -87,6 +88,86 @@ impl Kademlia {
     }
 
     pub async fn find_node(self, target_id: KademliaID) -> std::io::Result<()> {
+        let mut shortlist = Vec::new();
+        let mut queried_nodes = Vec::new();
+        let mut closest_node: Option<Contact> = None;
+        let mut current_alpha_contacts: Vec<Contact>;
+
+        // Step 1: Get the initial ALPHA closest contacts from the routing table
+        let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
+        let _ = self
+            .route_table_tx
+            .send(RouteTableCMD::GetClosestNodes(target_id.clone(), reply_tx))
+            .await;
+
+        if let Some(contacts) = reply_rx.recv().await {
+            shortlist = contacts;
+        }
+
+        loop {
+            // Step 2: Select ALPHA contacts from the shortlist
+            current_alpha_contacts = shortlist
+                .iter()
+                .filter(|contact| !queried_nodes.contains(&contact.id)) // exclude already queried
+                .take(ALPHA)
+                .cloned()
+                .collect();
+
+            if current_alpha_contacts.is_empty() {
+                break;
+            }
+
+            // Mark these nodes as queried
+            queried_nodes.extend(current_alpha_contacts.iter().map(|c| c.id.clone()));
+
+            // Step 3: Send FIND_NODE RPCs in parallel
+            let mut tasks = vec![];
+            for contact in current_alpha_contacts {
+                let target_addr = format!("{}:5678", contact.address); // `target_addr` is created here.
+                let target_id = target_id.clone(); // Clone `target_id` to avoid ownership issues.
+
+                // Move `target_addr` into the async block so it lives as long as the task
+                let rpc_task = tokio::spawn(async move {
+                    Networking::send_rpc_request(
+                        &target_addr, // Ownership is moved here
+                        Command::FINDNODE,
+                        Some(target_id), // Cloned `target_id` is moved here
+                        None,
+                        None,
+                    )
+                    .await
+                });
+
+                tasks.push(rpc_task);
+            }
+            let _ = futures::future::join_all(tasks).await;
+
+            // Step 4: Update shortlist with closer nodes
+            if let Some(contacts) = reply_rx.recv().await {
+                for contact in contacts {
+                    // Calculate distance and check if it's closer than closest_node
+                    if let Some(ref closest) = closest_node {
+                        if contact.less(closest.clone()) {
+                            closest_node = Some(contact.clone());
+                        }
+                    } else {
+                        closest_node = Some(contact.clone());
+                    }
+                    // Add contact to shortlist
+                    if !shortlist.iter().any(|c| c.id == contact.id) {
+                        shortlist.push(contact);
+                    }
+                }
+            }
+
+            // Stop if no new closest node is found
+            if let Some(closest) = closest_node.as_ref() {
+                if queried_nodes.contains(&closest.id) {
+                    break;
+                }
+            }
+        }
+
         Ok(())
     }
 

@@ -1,10 +1,10 @@
 use crate::kademlia_id::KademliaID;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use serde::{Deserialize,Serialize};
-#[derive(Serialize,Deserialize,Clone,Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Contact {
     pub id: KademliaID,
-    address: String,
+    pub address: String,
     distance: Option<KademliaID>,
 }
 

@@ -29,6 +29,7 @@ impl Cli {
                     Ok(command) => {
                         if let Command::EXIT = command {
                             println!("bombaclat node");
+                            return;
                             break;
                         }
                         self.execute_command(command).await;

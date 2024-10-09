@@ -13,37 +13,6 @@ use {
     tokio::sync::mpsc,
 };
 
-/*pub enum RouteTableCMD {
-    AddContact(Contact),
-    RemoveContact(KademliaID),
-    GetClosestNodes(KademliaID, mpsc::Sender<Vec<Contact>>),
-}
-
-async fn routing_table_handler(
-    mut rx: mpsc::Receiver<RouteTableCMD>,
-    mut routing_table: RoutingTable,
-) {
-    println!("route table handler");
-    while let Some(cmd) = rx.recv().await {
-        match cmd {
-            RouteTableCMD::AddContact(contact) => {
-                //let kad_id = contact.id.clone();
-                routing_table.add_contact(contact);
-                //println!("{:?}", routing_table.find_closest_contacts(kad_id, 5));
-            }
-            RouteTableCMD::RemoveContact(kad_id) => {
-                println!("remove  coibntact");
-            }
-            RouteTableCMD::GetClosestNodes(target_id, reply) => {
-                let contacts = routing_table.find_closest_contacts(target_id, BUCKET_SIZE);
-                println!("target_id: {:?}", target_id);
-                println!("contacts: {:?}", contacts);
-                let _ = reply.send(contacts).await;
-            }
-        }
-    }
-}*/
-
 #[derive(Clone)]
 pub struct Kademlia {
     route_table_tx: mpsc::Sender<RouteTableCMD>,
@@ -203,21 +172,3 @@ impl Kademlia {
         self.cli.read_input().await;
     }
 }
-
-/*
-+-----------------+                   +-----------------+
-|                 |                   |                 |
-|     My Node     |                   |   Other Node    |
-|                 |                   |                 |
-+-----------------+                   +-----------------+
-        |                                       |
-        | find_node(target_id)                  |
-        |-------------------------------------->|
-        |                               listen_for_rpc()
-        |                               Processes FIND_NODE request
-        |                               Accesses routing table
-        |<--------------------------------------|
-        | Receives response with contacts       |
-        | Processes response                    |
-
-*/

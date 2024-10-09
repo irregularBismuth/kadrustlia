@@ -25,8 +25,8 @@ pub async fn routing_table_handler(
             }
             RouteTableCMD::GetClosestNodes(target_id, reply) => {
                 let contacts = routing_table.find_closest_contacts(target_id, BUCKET_SIZE);
-                println!("target_id: {:?}", target_id);
-                println!("contacts: {:?}", contacts);
+                //println!("target_id: {:?}", target_id);
+                //println!("contacts: {:?}", contacts);
                 let _ = reply.send(contacts).await;
             }
         }

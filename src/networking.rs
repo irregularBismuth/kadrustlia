@@ -50,9 +50,27 @@ impl Networking {
             contact,
         };
         let bin_data = bincode::serialize(&rpc_msg).expect("Failed to serialize response");
-        let target = format!("{}:5678", target_addr);
-        socket.send_to(&bin_data, &target).await?;
-        println!("Sent response ({:?}) to {}", cmd, target);
+
+        let target = if target_addr.contains(':') {
+            let parts: Vec<&str> = target_addr.split(':').collect();
+            format!("{}:5678", parts[0])
+        } else {
+            format!("{}:5678", target_addr)
+        };
+
+        println!("Sending response to {}", target);
+
+        let mut attempts = 0;
+        while attempts < 3 {
+            if let Err(e) = socket.send_to(&bin_data, &target).await {
+                println!("Attempt {} to send failed: {}", attempts + 1, e);
+                attempts += 1;
+            } else {
+                println!("Successfully sent on attempt {}", attempts + 1);
+                break;
+            }
+        }
+
         Ok(())
     }
 
@@ -120,20 +138,36 @@ impl Networking {
                     Command::FINDVALUE => {
                         println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
 
-                        if let Some(target_id) = target_id {
+                        let src_ip = src.to_string();
+                        tokio::spawn(async move {
+                            Networking::send_rpc_response(
+                                &src_ip,
+                                Command::FINDVALUE,
+                                id,
+                                None,
+                                None,
+                            )
+                            .await
+                            .expect("no response was sent");
+                        });
+
+                        /*if let Some(target_id) = target_id {
                             let dir = "data";
                             let filename = format!("{}/{}.txt", dir, target_id.to_hex());
 
                             if let Ok(data) = tokio::fs::read_to_string(&filename).await {
                                 let src_ip = src.to_string();
-                                Networking::send_rpc_response(
-                                    &src_ip,
-                                    Command::FINDVALUE,
-                                    id,
-                                    Some(data),
-                                    None,
-                                )
-                                .await?;
+                                tokio::spawn(async move {
+                                    Networking::send_rpc_response(
+                                        &src_ip,
+                                        Command::FINDVALUE,
+                                        id,
+                                        Some(data),
+                                        None,
+                                    )
+                                    .await
+                                    .expect("no response was sent");
+                                });
                             } else {
                                 let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
 
@@ -142,24 +176,27 @@ impl Networking {
                                     .await;
 
                                 if let Some(contacts) = reply_rx.recv().await {
-                                    //let contacts_cp = contacts.clone();
-                                    //println!("{:?}", contacts_cp);
+                                    let contacts_cp = contacts.clone();
+                                    println!("contacts: {:?}", contacts_cp);
                                     let src_ip = src.to_string();
-                                    Networking::send_rpc_response(
-                                        &src_ip,
-                                        Command::FINDVALUE,
-                                        id,
-                                        None,
-                                        Some(contacts),
-                                    )
-                                    .await?;
+                                    tokio::spawn(async move {
+                                        Networking::send_rpc_response(
+                                            &src_ip,
+                                            Command::FINDVALUE,
+                                            id,
+                                            None,
+                                            Some(contacts),
+                                        )
+                                        .await
+                                        .expect("no response was sent");
+                                    });
                                 } else {
                                     println!("no contacts from routing table");
                                 }
                             }
                         } else {
                             println!("{:?} request missing target_id", method);
-                        }
+                        }*/
                     }
                     Command::STORE => {
                         println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
@@ -233,5 +270,7 @@ impl Networking {
                 }
             }
         }
+
+        println!("------------------OUT OF LOOP------------------");
     }
 }

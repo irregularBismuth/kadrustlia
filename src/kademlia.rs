@@ -1,12 +1,12 @@
 use {
     crate::{
         cli::Cli, constants::{rpc::Command, BUCKET_SIZE}, contact::Contact, kademlia_id::KademliaID,
-        networking::Networking, routing_table::RoutingTable, utils,
+        networking::Networking, routing_table::RoutingTable, utils, routing_table_handler::*,
     },
     tokio::sync::mpsc,
 };
 
-pub enum RouteTableCMD {
+/*pub enum RouteTableCMD {
     AddContact(Contact),
     RemoveContact(KademliaID),
     GetClosestNodes(KademliaID, mpsc::Sender<Vec<Contact>>),
@@ -20,9 +20,9 @@ async fn routing_table_handler(
     while let Some(cmd) = rx.recv().await {
         match cmd {
             RouteTableCMD::AddContact(contact) => {
-                let kad_id = contact.id.clone();
+                //let kad_id = contact.id.clone();
                 routing_table.add_contact(contact);
-                println!("{:?}", routing_table.find_closest_contacts(kad_id, 5));
+                //println!("{:?}", routing_table.find_closest_contacts(kad_id, 5));
             }
             RouteTableCMD::RemoveContact(kad_id) => {
                 println!("remove  coibntact");
@@ -35,7 +35,7 @@ async fn routing_table_handler(
             }
         }
     }
-}
+}*/
 
 #[derive(Clone)]
 pub struct Kademlia {
@@ -78,10 +78,6 @@ impl Kademlia {
         Networking::send_rpc_request(&boot_node_addr, Command::PING, None, None, None)
             .await
             .expect("failed to send PING");
-
-
-        let target_id = KademliaID::new();
-        Networking::send_rpc_request(&boot_node_addr, Command::FINDVALUE, Some(target_id), None, None).await.expect("failed");
     }
 
     pub async fn find_node(self, target_id: KademliaID) -> std::io::Result<()> {
@@ -91,7 +87,11 @@ impl Kademlia {
     }
 
     pub async fn find_value(self, target_id: KademliaID) -> std::io::Result<()> {
-
+        //let target_id = KademliaID::new();
+        let adr: String = utils::boot_node_address();
+        let boot_node_addr: String = format!("{}:{}", adr, "5678");
+        Networking::send_rpc_request(&boot_node_addr, Command::FINDVALUE, Some(target_id), None, None).await.expect("failed");
+        
         println!("ben");
         //Networking::send_rpc_request(target_addr, cmd, data, contact);
 

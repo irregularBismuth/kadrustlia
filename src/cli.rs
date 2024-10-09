@@ -44,9 +44,9 @@ impl Cli {
     async fn execute_command(&self, cmd: Command) {
         match cmd {
             Command::GET(hash) => {
-                let target_id = KademliaID::from_hex(hash);
+                //let target_id = KademliaID::from_hex(hash);
                 let kademlia = Kademlia::new();
-                kademlia.find_value(target_id).await.unwrap();
+                kademlia.find_value(KademliaID::new()).await.unwrap();
             }
             Command::PUT(data) => {
                 let kademlia = Kademlia::new();

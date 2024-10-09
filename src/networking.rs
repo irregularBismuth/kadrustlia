@@ -1,6 +1,6 @@
 use {
     crate::{
-        constants::rpc::Command, contact::Contact, kademlia::RouteTableCMD,
+        constants::rpc::Command, contact::Contact, routing_table_handler::*,
         kademlia_id::KademliaID, rpc::RpcMessage,
     },
     bincode::{deserialize, serialize},
@@ -142,6 +142,8 @@ impl Networking {
                                     .await;
 
                                 if let Some(contacts) = reply_rx.recv().await {
+                                    //let contacts_cp = contacts.clone();
+                                    //println!("{:?}", contacts_cp);
                                     let src_ip = src.to_string();
                                     Networking::send_rpc_response(
                                         &src_ip,
@@ -211,6 +213,7 @@ impl Networking {
                         if let Some(value) = data {
                             println!("value found: {}", value);
                         } else if let Some(contacts) = contact {
+                            println!("contacts: {:?}", contacts);
                             for contact in &contacts {
                                 let _ = tx.send(RouteTableCMD::AddContact(contact.clone())).await;
                             }

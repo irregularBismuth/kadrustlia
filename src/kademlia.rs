@@ -1,7 +1,13 @@
 use {
     crate::{
-        cli::Cli, constants::{rpc::Command, BUCKET_SIZE}, contact::Contact, kademlia_id::KademliaID,
-        networking::Networking, routing_table::RoutingTable, utils, routing_table_handler::*,
+        cli::Cli,
+        constants::{rpc::Command, BUCKET_SIZE},
+        contact::Contact,
+        kademlia_id::KademliaID,
+        networking::Networking,
+        routing_table::RoutingTable,
+        routing_table_handler::*,
+        utils,
     },
     tokio::sync::mpsc,
 };
@@ -81,8 +87,6 @@ impl Kademlia {
     }
 
     pub async fn find_node(self, target_id: KademliaID) -> std::io::Result<()> {
-        
-
         Ok(())
     }
 
@@ -90,8 +94,16 @@ impl Kademlia {
         //let target_id = KademliaID::new();
         let adr: String = utils::boot_node_address();
         let boot_node_addr: String = format!("{}:{}", adr, "5678");
-        Networking::send_rpc_request(&boot_node_addr, Command::FINDVALUE, Some(target_id), None, None).await.expect("failed");
-        
+        Networking::send_rpc_request(
+            &boot_node_addr,
+            Command::FINDVALUE,
+            Some(target_id),
+            None,
+            None,
+        )
+        .await
+        .expect("failed");
+
         println!("ben");
         //Networking::send_rpc_request(target_addr, cmd, data, contact);
 

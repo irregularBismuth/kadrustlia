@@ -22,12 +22,18 @@ impl RoutingTable {
 
     pub fn get_bucket_index(&mut self, id: KademliaID) -> usize {
         let distance: KademliaID = self.me.calc_distance(&id).get_distance();
-        distance
+        let index = distance
             .id
             .iter()
             .flat_map(|&byte| (0..8).rev().map(move |i| (byte >> i) & 1))
             .position(|bit| bit != 0)
-            .unwrap_or(RT_BCKT_SIZE - 1)
+            .unwrap_or(RT_BCKT_SIZE - 1);
+
+        if index >= RT_BCKT_SIZE {
+            return RT_BCKT_SIZE - 1;
+        }
+
+        index
     }
 
     pub fn add_contact(&mut self, contact: Contact) {

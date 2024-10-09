@@ -1,0 +1,991 @@
+src/rpc.rs:
+use crate::constants::rpc::Command;
+use crate::contact::Contact;
+use crate::kademlia_id::KademliaID;
+use serde::{Deserialize, Serialize};
+#[derive(Serialize, Deserialize, Debug)]
+pub enum RpcMessage {
+    Request {
+        id: KademliaID,
+        method: Command,
+        target_id: Option<KademliaID>,
+        data: Option<String>,
+        contact: Option<Vec<Contact>>,
+    },
+    Response {
+        id: KademliaID,
+        result: Command,
+        data: Option<String>,
+        contact: Option<Vec<Contact>>,
+    },
+    Error {
+        id: KademliaID,
+        message: String,
+    },
+}
+src/routing_table_handler.rs:
+use tokio::sync::mpsc;
+
+use crate::{constants::{ALPHA, BUCKET_SIZE}, contact::Contact, kademlia_id::KademliaID, routing_table::RoutingTable};
+
+pub enum RouteTableCMD {
+    AddContact(Contact),
+    RemoveContact(KademliaID),
+    GetClosestNodes(KademliaID, mpsc::Sender<Vec<Contact>>),
+}
+
+pub async fn routing_table_handler(
+    mut rx: mpsc::Receiver<RouteTableCMD>,
+    mut routing_table: RoutingTable,
+) {
+    println!("route table handler");
+    while let Some(cmd) = rx.recv().await {
+        match cmd {
+            RouteTableCMD::AddContact(contact) => {
+                //let kad_id = contact.id.clone();
+                routing_table.add_contact(contact);
+                //println!("{:?}", routing_table.find_closest_contacts(kad_id, 5));
+            }
+            RouteTableCMD::RemoveContact(kad_id) => {
+                println!("remove  coibntact");
+            }
+            RouteTableCMD::GetClosestNodes(target_id, reply) => {
+                let contacts = routing_table.find_closest_contacts(target_id, BUCKET_SIZE);
+                println!("target_id: {:?}", target_id);
+                println!("contacts: {:?}", contacts);
+                let _ = reply.send(contacts).await;
+            }
+        }
+    }
+}
+src/constants.rs:
+pub const ID_LENGTH: usize = 20;
+pub const BUCKET_SIZE: usize = 20;
+pub const ALPHA: usize = 3;
+pub const RT_BCKT_SIZE: usize = ID_LENGTH << 3;
+
+pub mod rpc {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+    pub enum Command {
+        PING,
+        PONG,
+        FINDNODE,
+        FINDVALUE,
+        STORE,
+    }
+}
+
+pub const ALL_IPV4: &str = "0.0.0.0";
+src/lib.rs:
+pub mod bucket;
+pub mod cli;
+pub mod constants;
+pub mod contact;
+pub mod kademlia;
+pub mod kademlia_id;
+pub mod networking;
+pub mod routing_table;
+pub mod routing_table_handler;
+pub mod rpc;
+pub mod tests;
+pub mod utils;
+src/kademlia_id.rs:
+use {
+    crate::constants::ID_LENGTH,
+    rand::Rng,
+    serde::{Deserialize, Serialize},
+    sha2::{Digest, Sha256},
+    std::cmp::*,
+    tokio::fs,
+};
+
+type KadId = [u8; ID_LENGTH];
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub struct KademliaID {
+    pub id: KadId,
+}
+
+impl KademliaID {
+    pub fn new() -> Self {
+        let mut id: KadId = [0u8; ID_LENGTH];
+        rand::thread_rng().fill(&mut id[..]);
+        Self { id }
+    }
+
+    pub fn from_hex(hex: String) -> Self {
+        let id: KadId = hex
+            .as_bytes()
+            .chunks(2)
+            .map(|chunk| {
+                let high = (chunk[0] as char).to_digit(16).unwrap();
+                let low = (chunk[1] as char).to_digit(16).unwrap();
+                ((high << 4) | low) as u8
+            })
+            .collect::<Vec<u8>>()
+            .try_into()
+            .expect("invalid kademlia id ");
+        Self { id }
+    }
+
+    pub fn with_id(id: KadId) -> Self {
+        Self { id }
+    }
+
+    pub async fn store_data(&mut self, data: String) -> Self {
+        let hash = Sha256::digest(data.as_bytes());
+        self.id.copy_from_slice(&hash[..ID_LENGTH]);
+
+        let dir = "data";
+        let filename = format!("{}/{}.txt", dir, self.to_hex());
+
+        match fs::create_dir_all(dir).await {
+            Ok(_) => {
+                eprintln!("Directory '{}' created or already exists", dir);
+            }
+            Err(e) => {
+                eprintln!("Failed to create directory '{}': {}", dir, e);
+            }
+        }
+
+        match fs::write(&filename, data).await {
+            Ok(_) => {
+                eprintln!("Data successfully stored in file: {}", filename);
+            }
+            Err(e) => {
+                eprintln!("Failed to store data in '{}': {}", filename, e);
+            }
+        }
+
+        *self
+    }
+
+    pub fn to_hex(&self) -> String {
+        self.id.iter().map(|byte| format!("{:02x}", byte)).collect()
+    }
+
+    pub fn less(&self, other: &KademliaID) -> bool {
+        self.id
+            .iter()
+            .zip(other.id.iter())
+            .find(|(a, b)| a != b)
+            .map_or(false, |(a, b)| a < b)
+    }
+
+    pub fn equals(&self, other: &KademliaID) -> bool {
+        self.id.iter().zip(other.id.iter()).all(|(a, b)| a == b)
+    }
+    pub fn distance(&self, other: &KademliaID) -> KademliaID {
+        KademliaID::with_id(core::array::from_fn(|i| self.id[i] ^ other.id[i]))
+    }
+}
+
+impl PartialEq for KademliaID {
+    fn eq(&self, other: &Self) -> bool {
+        self.equals(other)
+    }
+}
+impl Eq for KademliaID {}
+
+impl PartialOrd for KademliaID {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for KademliaID {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.less(other) {
+            Ordering::Less
+        } else if other.less(self) {
+            Ordering::Greater
+        } else {
+            Ordering::Equal
+        }
+    }
+}
+src/bucket.rs:
+use crate::contact::Contact;
+use crate::kademlia_id::KademliaID;
+use std::collections::LinkedList;
+use serde::Deserialize;
+use serde::Serialize;
+
+#[derive(Clone)]
+pub struct Bucket {
+    list: LinkedList<Contact>,
+}
+
+impl Bucket {
+
+    pub fn new() -> Self {
+        Self {
+            list: LinkedList::<Contact>::new(),
+        }
+    }
+    pub fn add_contact(&mut self, contact: Contact) -> &Self {
+        self.list.push_back(contact);
+        self
+    }
+
+    pub fn get_contact_and_calc_distance(&mut self, target: KademliaID) -> Vec<Contact> {
+        let mut contacts: Vec<Contact> = Vec::new();
+        for contact in self.list.iter_mut() {
+            contact.calc_distance(&target);
+            contacts.push(contact.clone());
+        }
+        contacts
+    }
+
+    pub fn len(&self) -> usize {
+        self.list.len()
+    }
+}
+src/kademlia.rs:
+use {
+    crate::{
+        cli::Cli, constants::{rpc::Command, BUCKET_SIZE}, contact::Contact, kademlia_id::KademliaID,
+        networking::Networking, routing_table::RoutingTable, utils, routing_table_handler::*,
+    },
+    tokio::sync::mpsc,
+};
+
+/*pub enum RouteTableCMD {
+    AddContact(Contact),
+    RemoveContact(KademliaID),
+    GetClosestNodes(KademliaID, mpsc::Sender<Vec<Contact>>),
+}
+
+async fn routing_table_handler(
+    mut rx: mpsc::Receiver<RouteTableCMD>,
+    mut routing_table: RoutingTable,
+) {
+    println!("route table handler");
+    while let Some(cmd) = rx.recv().await {
+        match cmd {
+            RouteTableCMD::AddContact(contact) => {
+                //let kad_id = contact.id.clone();
+                routing_table.add_contact(contact);
+                //println!("{:?}", routing_table.find_closest_contacts(kad_id, 5));
+            }
+            RouteTableCMD::RemoveContact(kad_id) => {
+                println!("remove  coibntact");
+            }
+            RouteTableCMD::GetClosestNodes(target_id, reply) => {
+                let contacts = routing_table.find_closest_contacts(target_id, BUCKET_SIZE);
+                println!("target_id: {:?}", target_id);
+                println!("contacts: {:?}", contacts);
+                let _ = reply.send(contacts).await;
+            }
+        }
+    }
+}*/
+
+#[derive(Clone)]
+pub struct Kademlia {
+    route_table_tx: mpsc::Sender<RouteTableCMD>,
+    cli: Cli,
+}
+
+impl Kademlia {
+    pub fn new() -> Self {
+        let kad_id = KademliaID::new();
+        let addr = utils::get_own_address();
+        println!("my addr is {}", addr);
+        let contact: Contact = Contact::new(kad_id, addr);
+        let (tx, rx) = mpsc::channel(32);
+        let initial_contact = contact.clone();
+        tokio::spawn(async move {
+            let routing_table = RoutingTable::new(initial_contact);
+            routing_table_handler(rx, routing_table).await;
+        });
+
+        Self {
+            cli: Cli::new(),
+            route_table_tx: tx,
+        }
+    }
+
+    pub async fn listen(&self, addr: &str) {
+        let tx = self.route_table_tx.clone();
+        let _ = Networking::listen_for_rpc(tx, addr).await;
+    }
+
+    pub async fn join(&self) {
+        if utils::check_bn() {
+            return;
+        }
+        let adr: String = utils::boot_node_address();
+        let boot_node_addr: String = format!("{}:{}", adr, "5678");
+        println!("Boot node address: {}", boot_node_addr);
+
+        Networking::send_rpc_request(&boot_node_addr, Command::PING, None, None, None)
+            .await
+            .expect("failed to send PING");
+    }
+
+    pub async fn find_node(self, target_id: KademliaID) -> std::io::Result<()> {
+        
+
+        Ok(())
+    }
+
+    pub async fn find_value(self, target_id: KademliaID) -> std::io::Result<()> {
+        //let target_id = KademliaID::new();
+        let adr: String = utils::boot_node_address();
+        let boot_node_addr: String = format!("{}:{}", adr, "5678");
+        Networking::send_rpc_request(&boot_node_addr, Command::FINDVALUE, Some(target_id), None, None).await.expect("failed");
+        
+        println!("ben");
+        //Networking::send_rpc_request(target_addr, cmd, data, contact);
+
+        Ok(())
+    }
+
+    pub async fn store(self, data: String) -> std::io::Result<()> {
+        let mut kad_id = KademliaID::new();
+        kad_id.store_data(data.clone()).await;
+        println!("Data stored with kademlia id: {}", kad_id.to_hex());
+
+        Ok(())
+    }
+
+    pub async fn start_cli(&self) {
+        self.cli.read_input().await;
+    }
+}
+
+/*
++-----------------+                   +-----------------+
+|                 |                   |                 |
+|     My Node     |                   |   Other Node    |
+|                 |                   |                 |
++-----------------+                   +-----------------+
+        |                                       |
+        | find_node(target_id)                  |
+        |-------------------------------------->|
+        |                               listen_for_rpc()
+        |                               Processes FIND_NODE request
+        |                               Accesses routing table
+        |<--------------------------------------|
+        | Receives response with contacts       |
+        | Processes response                    |
+
+*/
+src/tests.rs:
+#[cfg(test)]
+mod tests {
+    use crate::kademlia_id::KademliaID;
+    #[test]
+    fn xor_metric() {
+        let kad_id_1: KademliaID = KademliaID::new();
+        //assert_eq!(kad_id_1.distance(&kad_id_1.clone()));
+
+        let kad_id_2: KademliaID = KademliaID::new();
+        // assert_eq!(kad_id_1.distance(&kad_id_2) > 0, true);
+    }
+
+    #[test]
+    fn xor_metric_triangle_inequality() {
+        /*  let kad_id_1 = KademliaID::new();
+            let kad_id_2 = KademliaID::new();
+            let kad_id_3 = KademliaID::new();
+            let ab = kad_id_1.distance(&kad_id_2);
+            let bc = kad_id_2.distance(&kad_id_3);
+            let ac = kad_id_1.distance(&kad_id_3);
+            assert!(ab + bc >= ac, "Triangle inequality failed");
+        */
+    }
+
+    #[tokio::test]
+    async fn hash_data() {
+        let kad_id = KademliaID::new()
+            .store_data("test".to_string())
+            .await
+            .to_hex();
+        let kad_id2 = KademliaID::new()
+            .store_data("test".to_string())
+            .await
+            .to_hex();
+        assert_eq!(kad_id, kad_id2, "Don't have same hash");
+    }
+}
+src/cli.rs:
+use ::tokio::io::{self, AsyncBufReadExt, AsyncWriteExt};
+
+use crate::{kademlia::{self, Kademlia}, kademlia_id::KademliaID};
+
+enum Command {
+    GET(String),
+    PUT(String),
+    EXIT,
+}
+#[derive(Clone)]
+pub struct Cli {}
+
+impl Cli {
+    pub fn new() -> Self {
+        Cli {}
+    }
+
+    pub async fn read_input(&self) {
+        let stdin = io::stdin();
+        let mut reader = io::BufReader::new(stdin).lines();
+
+        loop {
+            io::stdout().flush().await.unwrap();
+
+            if let Some(line) = reader.next_line().await.unwrap() {
+                let input = line.trim().to_lowercase();
+
+                match self.parse_command(&input) {
+                    Ok(command) => {
+                        if let Command::EXIT = command {
+                            println!("bombaclat node");
+                            break;
+                        }
+                        self.execute_command(command).await;
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    async fn execute_command(&self, cmd: Command) {
+        match cmd {
+            Command::GET(hash) => {
+                //let target_id = KademliaID::from_hex(hash);
+                let kademlia = Kademlia::new();
+                kademlia.find_value(KademliaID::new()).await.unwrap();
+            }
+            Command::PUT(data) => {
+                let kademlia = Kademlia::new();
+                kademlia.store(data).await.unwrap();
+
+                // let data = data.as_bytes().to_vec();
+                //client.store(data).await.unwrap();
+            }
+            Command::EXIT => {
+                println!("Exiting...");
+            }
+        }
+    }
+
+    fn parse_command(&self, input: &str) -> Result<Command, &'static str> {
+        let mut parts = input.split_whitespace();
+        let command = parts.next().unwrap_or_default();
+
+        match command {
+            "get" => {
+                if let Some(arg) = parts.next() {
+                    Ok(Command::GET(arg.to_string()))
+                } else {
+                    Err("GET: missing hash argument")
+                }
+            }
+            "put" => {
+                if let Some(arg) = parts.next() {
+                    Ok(Command::PUT(arg.to_string()))
+                } else {
+                    Err("PUT: missing data argument")
+                }
+            }
+            "exit" => Ok(Command::EXIT),
+            _ => Err("Unknown command"),
+        }
+    }
+}src/utils.rs:
+use std::env;
+use std::process;
+pub fn check_bn() -> bool {
+    let bn_value = env::var("BN").unwrap_or_else(|_| "0".to_string());
+    bn_value == "1"
+}
+
+pub fn boot_node_address() -> String {
+    if !check_bn() {
+        match env::var("BNAD") {
+            Ok(boot_node_address) => boot_node_address,
+            Err(_) => "unset".to_string(),
+        }
+    } else {
+        "BN is not set".to_string()
+    }
+}
+
+pub fn get_own_address() -> String {
+    #[cfg(feature = "local")]
+    {
+        "127.0.0.1".to_string()
+    }
+
+    #[cfg(not(feature = "local"))]
+    {
+        let output = process::Command::new("hostname")
+            .arg("-i")
+            .output()
+            .expect("failed to execute hostname command");
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    }
+}
+src/contact.rs:
+use crate::kademlia_id::KademliaID;
+use std::cmp::Ordering;
+use serde::{Deserialize,Serialize};
+#[derive(Serialize,Deserialize,Clone,Debug)]
+pub struct Contact {
+    pub id: KademliaID,
+    address: String,
+    distance: Option<KademliaID>,
+}
+
+type Contacts = Vec<Contact>;
+
+impl Contact {
+    pub fn new(id: KademliaID, address: String) -> Self {
+        Self {
+            id,
+            address,
+            distance: None,
+        }
+    }
+
+    pub fn contact_from_hex(hex: String, address: String) -> Self {
+        Self {
+            id: KademliaID::from_hex(hex),
+            address,
+            distance: None,
+        }
+    }
+
+    pub fn calc_distance(&mut self, target: &KademliaID) -> &mut Self {
+        self.distance = Some(target.distance(&self.id));
+        self
+    }
+
+    pub fn get_distance(&self) -> KademliaID {
+        self.distance
+            .expect("error no distance was set for contact")
+    }
+
+    pub fn less(&self, other: Contact) -> bool {
+        self.get_distance().less(&other.get_distance())
+    }
+}
+
+pub struct ContactCandidates {
+    contacts: Contacts,
+}
+
+impl ContactCandidates {
+    pub fn new() -> Self {
+        Self {
+            contacts: Vec::new(),
+        }
+    }
+    pub fn append(&mut self, contacts: &mut Contacts) -> &mut Self {
+        self.contacts.append(contacts);
+        self
+    }
+
+    pub fn sort(&mut self) {
+        self.contacts
+            .sort_by(|a, b| a.get_distance().cmp(&b.get_distance()));
+    }
+
+    pub fn len(&self) -> usize {
+        self.contacts.len()
+    }
+
+    pub fn get_contacts(&mut self, count: usize) -> &mut [Contact] {
+        let len = self.contacts.len();
+        let end = count.min(len);
+        &mut self.contacts[0..end]
+    }
+
+    pub fn swap(&mut self, i: usize, j: usize) {
+        self.contacts.swap(i, j);
+    }
+
+    pub fn less(&self, i: usize, j: usize) -> bool {
+        self.contacts[i].less(self.contacts[j].clone())
+    }
+}
+src/routing_table.rs:
+use crate::{
+    bucket::Bucket,
+    constants::{BUCKET_SIZE, ID_LENGTH, RT_BCKT_SIZE},
+    contact::Contact,
+    contact::ContactCandidates,
+    kademlia_id::KademliaID,
+};
+
+#[derive(Clone)]
+pub struct RoutingTable {
+    me: Contact,
+    buckets: [Option<Bucket>; RT_BCKT_SIZE],
+}
+
+impl RoutingTable {
+    pub fn new(me: Contact) -> Self {
+        Self {
+            me,
+            buckets: std::array::from_fn(|_| None),
+        }
+    }
+
+    pub fn get_bucket_index(&mut self, id: KademliaID) -> usize {
+        let distance: KademliaID = self.me.calc_distance(&id).get_distance();
+        let index = distance
+            .id
+            .iter()
+            .flat_map(|&byte| (0..8).rev().map(move |i| (byte >> i) & 1))
+            .position(|bit| bit != 0)
+            .unwrap_or(RT_BCKT_SIZE - 1);
+
+        if index >= RT_BCKT_SIZE {
+            return RT_BCKT_SIZE - 1;
+        }
+
+        index
+    }
+
+    pub fn add_contact(&mut self, contact: Contact) {
+        let index: usize = self.get_bucket_index(contact.id.clone());
+        match &mut self.buckets[index] {
+            Some(bucket) => {
+                bucket.add_contact(contact);
+            }
+            None => {
+                let mut bucket = Bucket::new();
+                bucket.add_contact(contact);
+                self.buckets[index] = Some(bucket);
+            }
+        }
+    }
+
+    pub fn find_closest_contacts(&mut self, target: KademliaID, count: usize) -> Vec<Contact> {
+        let mut candidates = ContactCandidates::new();
+        let bucket_index = self.get_bucket_index(target);
+        if let Some(bucket) = self.buckets[bucket_index].as_mut() {
+            let mut contacts = bucket.get_contact_and_calc_distance(target);
+            candidates.append(&mut contacts);
+        }
+        let mut i = 0;
+        while (bucket_index as isize - i as isize >= 0 || bucket_index + i < ID_LENGTH * 8)
+            && candidates.len() < count
+        {
+            if bucket_index - i >= 0 {
+                if let Some(bucket_) = self.buckets[bucket_index - 1].as_mut() {
+                    let mut cntcs = bucket_.get_contact_and_calc_distance(target);
+                    candidates.append(&mut cntcs);
+                }
+                if let Some(bucket_) = self.buckets[bucket_index + 1].as_mut() {
+                    let mut cntcs = bucket_.get_contact_and_calc_distance(target);
+                    candidates.append(&mut cntcs);
+                }
+            }
+            i = i + 1;
+        }
+        candidates.sort();
+        let mut count_ = count;
+        if count_ > candidates.len() {
+            count_ = candidates.len();
+        }
+        candidates.get_contacts(count_).to_vec()
+    }
+}
+src/networking.rs:
+use {
+    crate::{
+        constants::rpc::Command, contact::Contact, routing_table_handler::*,
+        kademlia_id::KademliaID, rpc::RpcMessage,
+    },
+    bincode::{deserialize, serialize},
+    tokio::net::{lookup_host, ToSocketAddrs, UdpSocket},
+    tokio::sync::mpsc,
+};
+
+pub struct Networking;
+
+impl Networking {
+    pub async fn send_rpc_request(
+        target_addr: &str,
+        cmd: Command,
+        target_id: Option<KademliaID>,
+        data: Option<String>,
+        contact: Option<Vec<Contact>>,
+    ) -> std::io::Result<()> {
+        let socket = UdpSocket::bind("0.0.0.0:0").await?;
+        let rpc_msg = RpcMessage::Request {
+            id: KademliaID::new(),
+            method: cmd,
+            target_id,
+            data,
+            contact,
+        };
+        for addr in lookup_host(target_addr).await? {
+            let bin_data = bincode::serialize(&rpc_msg).expect("failed to serialize data");
+            socket.send_to(&bin_data, &addr).await?;
+            println!("Sent {:?} to {}", cmd, &addr);
+            break;
+        }
+        Ok(())
+    }
+
+    pub async fn send_rpc_response(
+        target_addr: &str,
+        cmd: Command,
+        id: KademliaID,
+        data: Option<String>,
+        contact: Option<Vec<Contact>>,
+    ) -> tokio::io::Result<()> {
+        let socket = UdpSocket::bind("0.0.0.0:0").await?;
+        let rpc_msg = RpcMessage::Response {
+            id,
+            result: cmd,
+            data,
+            contact,
+        };
+        let bin_data = bincode::serialize(&rpc_msg).expect("Failed to serialize response");
+        let target = format!("{}:5678", target_addr);
+        socket.send_to(&bin_data, &target).await?;
+        println!("Sent response ({:?}) to {}", cmd, target);
+        Ok(())
+    }
+
+    pub async fn listen_for_rpc(
+        mut tx: mpsc::Sender<RouteTableCMD>,
+        bind_addr: &str,
+    ) -> std::io::Result<()> {
+        let socket = UdpSocket::bind(bind_addr).await?;
+        println!("Listening for RPC messages on {}", bind_addr);
+
+        let mut buf = [0u8; 1024];
+
+        loop {
+            let (len, src) = socket.recv_from(&mut buf).await?;
+
+            let received_msg: RpcMessage =
+                bincode::deserialize(&buf[..len]).expect("failed to deserialize data");
+
+            match received_msg {
+                RpcMessage::Request {
+                    id,
+                    method,
+                    target_id,
+                    data,
+                    contact,
+                } => match method {
+                    Command::PING => {
+                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+                        let src_ip = src.ip().to_string();
+                        let dest_cp = src_ip.clone();
+                        let dest_cp_cp = src_ip.clone();
+
+                        let _ = tx.send(RouteTableCMD::AddContact(Contact::new(id, dest_cp))).await;
+                        //let _ = tx.send(RouteTableCMD::GetClosestNodes(id)).await;
+                        tokio::spawn(async move {
+                            Networking::send_rpc_response(&src_ip, Command::PONG, id, None, None)
+                                .await
+                                .expect("no response was sent");
+                        });
+
+                        println!("Sent PONG to {}", dest_cp_cp);
+                    }
+                    Command::FINDNODE => {
+                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+
+                        //let Some(data) = target;
+
+                        //let target = KademliaID::from_hex(data.expect("expected valid hex string"));
+
+                        if let Some(target_id) = target_id {
+                            let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
+
+                            let _ = tx.send(RouteTableCMD::GetClosestNodes(target_id, reply_tx)).await;
+
+                            if let Some(contacts) = reply_rx.recv().await {
+                                let src_ip = src.to_string();
+                                Networking::send_rpc_response(&src_ip, Command::FINDNODE, id, None, Some(contacts)).await?;
+                            } else {
+                                println!("no conacts from routing table");
+                            }
+                        } else {
+                            println!("{:?} request missing target_id", method);
+                        }
+                    }
+                    Command::FINDVALUE => {
+                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+
+                        if let Some(target_id) = target_id {
+                            let dir = "data";
+                            let filename = format!("{}/{}.txt", dir, target_id.to_hex());
+
+                            if let Ok(data) = tokio::fs::read_to_string(&filename).await {
+                                let src_ip = src.to_string();
+                                Networking::send_rpc_response(
+                                    &src_ip,
+                                    Command::FINDVALUE,
+                                    id,
+                                    Some(data),
+                                    None,
+                                )
+                                .await?;
+                            } else {
+                                let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
+
+                                let _ = tx
+                                    .send(RouteTableCMD::GetClosestNodes(target_id, reply_tx))
+                                    .await;
+
+                                if let Some(contacts) = reply_rx.recv().await {
+                                    //let contacts_cp = contacts.clone();
+                                    //println!("{:?}", contacts_cp);
+                                    let src_ip = src.to_string();
+                                    Networking::send_rpc_response(
+                                        &src_ip,
+                                        Command::FINDVALUE,
+                                        id,
+                                        None,
+                                        Some(contacts),
+                                    )
+                                    .await?;
+                                } else {
+                                    println!("no contacts from routing table");
+                                }
+                            }
+                        } else {
+                            println!("{:?} request missing target_id", method);
+                        }
+                    }
+                    Command::STORE => {
+                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+                        if let Some(data) = data {
+                            let mut kad_id = KademliaID::new();
+                            kad_id.store_data(data).await;
+
+                            let src_ip = src.ip().to_string();
+                            tokio::spawn(async move {
+                                Networking::send_rpc_response(
+                                    &src_ip,
+                                    Command::STORE,
+                                    kad_id,
+                                    None,
+                                    None,
+                                )
+                                .await
+                                .expect("Failed to send STORE response");
+                            });
+                        } else {
+                            println!("STORE request missing data");
+                        }
+                    }
+                    _ => {
+                        println!("Received unexpected command from {}", src);
+                    }
+                },
+                RpcMessage::Response {
+                    id,
+                    result,
+                    data,
+                    contact,
+                } => match result {
+                    Command::PONG => {
+                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+                    }
+                    Command::FINDNODE => {
+                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+
+                        if let Some(contacts) = contact {
+                            for contact in &contacts {
+                                let _ = tx.send(RouteTableCMD::AddContact(contact.clone())).await;
+                            }
+                        } else {
+                            println!("{:?} missing contacts", result);
+                        }
+                    }
+                    Command::FINDVALUE => {
+                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+
+                        if let Some(value) = data {
+                            println!("value found: {}", value);
+                        } else if let Some(contacts) = contact {
+                            println!("contacts: {:?}", contacts);
+                            for contact in &contacts {
+                                let _ = tx.send(RouteTableCMD::AddContact(contact.clone())).await;
+                            }
+                        } else {
+                            println!("{:?} response missing data and contacts", result);
+                        }
+                    }
+                    Command::STORE => {
+                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+                    }
+                    _ => {
+                        println!("Received Response with ID {} and result: {:?}", id.to_hex(), result);
+                    }
+                },
+                RpcMessage::Error { id, message } => {
+                    println!("Received Error with ID {}: {}", id.to_hex(), message);
+                }
+            }
+        }
+    }
+}
+src/main.rs:
+use {
+    axum::{http::StatusCode, routing::get, Json, Router},
+    kadrustlia::{
+        cli::Cli,
+        constants::{rpc::Command, ALL_IPV4},
+        contact::Contact,
+        kademlia::Kademlia,
+        kademlia_id::KademliaID,
+        networking::Networking,
+        rpc::RpcMessage,
+        utils,
+    },
+    std::net::SocketAddr,
+    std::sync::Arc,
+    tokio::net::ToSocketAddrs,
+    tokio::sync::Mutex,
+};
+
+async fn root() -> &'static str {
+    "Hello world!"
+}
+
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // REST interface ##################
+    tokio::spawn(async move {
+        let app = Router::new().route("/", get(root));
+        let ip = format!("{}:{}", ALL_IPV4, "3000");
+        let listener = tokio::net::TcpListener::bind(ip).await.unwrap();
+        axum::serve(listener, app).await.unwrap();
+    });
+    //#################################
+
+    let bind_addr = format!("{}:{}", ALL_IPV4, "5678");
+
+    let kademlia = Kademlia::new();
+    let kademlia_c = kademlia.clone();
+    let kademlia_c2 = kademlia.clone();
+    let listen_task = tokio::spawn(async move {
+        kademlia.listen(&bind_addr).await;
+    });
+    let join_task = tokio::spawn(async move {
+        kademlia_c.join().await;
+    });
+    let join_task_2 = tokio::spawn(async move {
+        kademlia_c2.start_cli().await;
+    });
+    let _ = tokio::join!(listen_task, join_task, join_task_2);
+    Ok(())
+}

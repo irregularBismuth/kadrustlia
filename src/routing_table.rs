@@ -22,12 +22,17 @@ impl RoutingTable {
 
     pub fn get_bucket_index(&mut self, id: KademliaID) -> usize {
         let distance: KademliaID = self.me.calc_distance(&id).get_distance();
-        distance
+
+        if let Some(position) = distance
             .id
             .iter()
             .flat_map(|&byte| (0..8).rev().map(move |i| (byte >> i) & 1))
             .position(|bit| bit != 0)
-            .unwrap_or(RT_BCKT_SIZE - 1)
+        {
+            position
+        } else {
+            0
+        }
     }
 
     pub fn add_contact(&mut self, contact: Contact) {
@@ -47,26 +52,32 @@ impl RoutingTable {
     pub fn find_closest_contacts(&mut self, target: KademliaID, count: usize) -> Vec<Contact> {
         let mut candidates = ContactCandidates::new();
         let bucket_index = self.get_bucket_index(target);
+
         if let Some(bucket) = self.buckets[bucket_index].as_mut() {
             let mut contacts = bucket.get_contact_and_calc_distance(target);
             candidates.append(&mut contacts);
         }
-        let mut i = 0;
+
+        let mut i = 1;
         while (bucket_index as isize - i as isize >= 0 || bucket_index + i < ID_LENGTH * 8)
             && candidates.len() < count
         {
-            if bucket_index - i >= 0 {
-                if let Some(bucket_) = self.buckets[bucket_index - 1].as_mut() {
-                    let mut cntcs = bucket_.get_contact_and_calc_distance(target);
-                    candidates.append(&mut cntcs);
-                }
-                if let Some(bucket_) = self.buckets[bucket_index + 1].as_mut() {
+            if bucket_index >= i {
+                if let Some(bucket_) = self.buckets[bucket_index - i].as_mut() {
                     let mut cntcs = bucket_.get_contact_and_calc_distance(target);
                     candidates.append(&mut cntcs);
                 }
             }
-            i = i + 1;
+
+            if bucket_index + i < ID_LENGTH * 8 {
+                if let Some(bucket_) = self.buckets[bucket_index + i].as_mut() {
+                    let mut cntcs = bucket_.get_contact_and_calc_distance(target);
+                    candidates.append(&mut cntcs);
+                }
+            }
+            i += 1;
         }
+
         candidates.sort();
         let mut count_ = count;
         if count_ > candidates.len() {

@@ -1,36 +1,10 @@
 use {
     crate::{
-        cli::Cli, constants::rpc::Command, contact::Contact, kademlia_id::KademliaID,
-        networking::Networking, routing_table::RoutingTable, utils,
+        cli::Cli, constants::{rpc::Command, BUCKET_SIZE}, contact::Contact, kademlia_id::KademliaID,
+        networking::Networking, routing_table::RoutingTable, utils, routing_table_handler::*,
     },
     tokio::sync::mpsc,
 };
-
-pub enum RouteTableCMD {
-    AddContact(Contact),
-    RemoveContact(KademliaID),
-    GetClosestNodes(KademliaID),
-}
-
-async fn routing_table_handler(
-    mut rx: mpsc::Receiver<RouteTableCMD>,
-    mut routing_table: RoutingTable,
-) {
-    println!("route table handler");
-    while let Some(cmd) = rx.recv().await {
-        match cmd {
-            RouteTableCMD::AddContact(contact) => {
-                println!("ping  hello ");
-            }
-            RouteTableCMD::RemoveContact(kad_id) => {
-                println!("remove  coibntact");
-            }
-            RouteTableCMD::GetClosestNodes(kad_id) => {
-                println!("kademlia we got {}", kad_id.to_hex());
-            }
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct Kademlia {
@@ -70,16 +44,26 @@ impl Kademlia {
         let boot_node_addr: String = format!("{}:{}", adr, "5678");
         println!("Boot node address: {}", boot_node_addr);
 
-        Networking::send_rpc_request(&boot_node_addr, Command::PING, None, None)
+        Networking::send_rpc_request(&boot_node_addr, Command::PING, None, None, None)
             .await
             .expect("failed to send PING");
     }
 
     pub async fn find_node(self, target_id: KademliaID) -> std::io::Result<()> {
+        
+
         Ok(())
     }
 
     pub async fn find_value(self, target_id: KademliaID) -> std::io::Result<()> {
+        //let target_id = KademliaID::new();
+        let adr: String = utils::boot_node_address();
+        let boot_node_addr: String = format!("{}:{}", adr, "5678");
+        Networking::send_rpc_request(&boot_node_addr, Command::FINDVALUE, Some(target_id), None, None).await.expect("failed");
+        
+        println!("ben");
+        //Networking::send_rpc_request(target_addr, cmd, data, contact);
+
         Ok(())
     }
 
@@ -95,21 +79,3 @@ impl Kademlia {
         self.cli.read_input().await;
     }
 }
-
-/*
-+-----------------+                   +-----------------+
-|                 |                   |                 |
-|     My Node     |                   |   Other Node    |
-|                 |                   |                 |
-+-----------------+                   +-----------------+
-        |                                       |
-        | find_node(target_id)                  |
-        |-------------------------------------->|
-        |                               listen_for_rpc()
-        |                               Processes FIND_NODE request
-        |                               Accesses routing table
-        |<--------------------------------------|
-        | Receives response with contacts       |
-        | Processes response                    |
-
-*/

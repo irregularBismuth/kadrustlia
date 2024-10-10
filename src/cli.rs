@@ -2,10 +2,7 @@ use std::sync::Arc;
 
 use ::tokio::io::{self, AsyncBufReadExt, AsyncWriteExt};
 
-use crate::{
-    kademlia::Kademlia,
-    kademlia_id::KademliaID,
-};
+use crate::{kademlia::Kademlia, kademlia_id::KademliaID};
 
 enum Command {
     GET(String),
@@ -26,7 +23,10 @@ enum CMDStatus {
 
 impl Cli {
     pub fn new(kademlia: Arc<Kademlia>, shutdown_tx: tokio::sync::broadcast::Sender<()>) -> Self {
-        Cli { kademlia, shutdown_tx }
+        Cli {
+            kademlia,
+            shutdown_tx,
+        }
     }
 
     pub async fn read_input(&self) {

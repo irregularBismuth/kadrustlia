@@ -1,6 +1,12 @@
 use {
     crate::{
-        constants::{rpc::Command, ALPHA, BUCKET_SIZE}, contact::Contact, kademlia_id::KademliaID, networking::Networking, routing_table::RoutingTable, routing_table_handler::*, utils
+        constants::{rpc::Command, ALPHA, BUCKET_SIZE},
+        contact::Contact,
+        kademlia_id::KademliaID,
+        networking::Networking,
+        routing_table::RoutingTable,
+        routing_table_handler::*,
+        utils,
     },
     tokio::sync::mpsc,
 };
@@ -23,9 +29,7 @@ impl Kademlia {
             routing_table_handler(rx, routing_table).await;
         });
 
-        Self {
-            route_table_tx: tx,
-        }
+        Self { route_table_tx: tx }
     }
 
     pub async fn listen(&self, addr: &str) {
@@ -68,7 +72,7 @@ impl Kademlia {
             .await;
 
         if let Some(initial_contacts) = reply_rx.recv().await {
-            for contact in initial_contacts.into_iter().take(ALPHA) {
+            for contact in initial_contacts.into_iter().take(BUCKET_SIZE) {
                 println!(
                     "Adding contact {} to initial shortlist",
                     contact.id.to_hex()
@@ -84,7 +88,7 @@ impl Kademlia {
             let unqueried_contacts: Vec<Contact> = shortlist
                 .iter()
                 .filter(|(_, queried)| !queried)
-                .take(ALPHA)
+                .take(BUCKET_SIZE)
                 .map(|(contact, _)| contact.clone())
                 .collect();
 

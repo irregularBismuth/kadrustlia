@@ -2,7 +2,7 @@ use {
     crate::{
         cli::Cli,
         constants::{rpc::Command, ALPHA, BUCKET_SIZE},
-        contact::Contact,
+        contact::{Contact, ContactCandidates},
         kademlia_id::KademliaID,
         networking::Networking,
         routing_table::RoutingTable,
@@ -55,7 +55,11 @@ impl Kademlia {
             .expect("failed to send PING");
     }
 
+<<<<<<< HEAD
     pub async fn find_node(self, target_id: KademliaID) -> std::io::Result<()> {
+=======
+    pub async fn find_node(&self, target_id: KademliaID) -> std::io::Result<()> {
+>>>>>>> 4184eb2 (start on unit test sorta work)
         Ok(())
     }
 

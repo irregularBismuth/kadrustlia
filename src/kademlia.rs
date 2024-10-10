@@ -1,13 +1,6 @@
 use {
     crate::{
-        cli::Cli,
-        constants::{rpc::Command, ALPHA, BUCKET_SIZE},
-        contact::{Contact, ContactCandidates},
-        kademlia_id::KademliaID,
-        networking::Networking,
-        routing_table::RoutingTable,
-        routing_table_handler::*,
-        utils,
+        constants::{rpc::Command, ALPHA, BUCKET_SIZE}, contact::Contact, kademlia_id::KademliaID, networking::Networking, routing_table::RoutingTable, routing_table_handler::*, utils
     },
     tokio::sync::mpsc,
 };
@@ -15,7 +8,6 @@ use {
 #[derive(Clone)]
 pub struct Kademlia {
     route_table_tx: mpsc::Sender<RouteTableCMD>,
-    cli: Cli,
 }
 
 impl Kademlia {
@@ -32,7 +24,6 @@ impl Kademlia {
         });
 
         Self {
-            cli: Cli::new(),
             route_table_tx: tx,
         }
     }
@@ -202,7 +193,7 @@ impl Kademlia {
         Ok(active_contacts)
     }
 
-    pub async fn find_value(self, target_id: KademliaID) -> std::io::Result<()> {
+    pub async fn find_value(&self, target_id: KademliaID) -> std::io::Result<()> {
         //let target_id = KademliaID::new();
         let adr: String = utils::boot_node_address();
         let boot_node_addr: String = format!("{}:{}", adr, "5678");
@@ -219,18 +210,14 @@ impl Kademlia {
         println!("ben");
         //Networking::send_rpc_request(target_addr, cmd, data, contact);
 
+        println!("Value found or contacts returned");
         Ok(())
     }
 
-    pub async fn store(self, data: String) -> std::io::Result<()> {
+    pub async fn store(&self, data: String) -> std::io::Result<()> {
         let mut kad_id = KademliaID::new();
         kad_id.store_data(data.clone()).await;
         println!("Data stored with kademlia id: {}", kad_id.to_hex());
-
         Ok(())
-    }
-
-    pub async fn start_cli(&self) {
-        self.cli.read_input().await;
     }
 }

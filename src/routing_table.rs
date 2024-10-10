@@ -61,7 +61,7 @@ impl RoutingTable {
         }
 
         let mut i = 1;
-        while (bucket_index as isize - i as isize >= 0 || bucket_index + i < ID_LENGTH * 8)
+        while (bucket_index as isize - i as isize >= 0 || bucket_index + i < RT_BCKT_SIZE)
             && candidates.len() < count
         {
             if bucket_index >= i {
@@ -71,7 +71,7 @@ impl RoutingTable {
                 }
             }
 
-            if bucket_index + i < ID_LENGTH * 8 {
+            if bucket_index + i < RT_BCKT_SIZE {
                 if let Some(bucket_) = self.buckets[bucket_index + i].as_mut() {
                     let mut cntcs = bucket_.get_contact_and_calc_distance(target);
                     candidates.append(&mut cntcs);

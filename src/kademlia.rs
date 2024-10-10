@@ -100,7 +100,7 @@ impl Kademlia {
             }
 
             let mut tasks = vec![];
-            for contact in &unqueried_contacts {
+            for contact in unqueried_contacts.iter().take(ALPHA) {
                 println!("Querying contact: {}", contact.id.to_hex());
                 let target_addr = format!("{}:{}", contact.address, "5678");
                 let target_id_copy = target_id.clone();

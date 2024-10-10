@@ -3,7 +3,7 @@ use std::sync::Arc;
 use ::tokio::io::{self, AsyncBufReadExt, AsyncWriteExt};
 
 use crate::{
-    kademlia::{self, Kademlia},
+    kademlia::Kademlia,
     kademlia_id::KademliaID,
 };
 
@@ -65,9 +65,8 @@ impl Cli {
                 CMDStatus::CONTINUE
             }
             Command::FINDNODE(target_id_hex) => {
-                let kademlia = Kademlia::new();
                 let target_id = KademliaID::from_hex(target_id_hex);
-                match kademlia.iterative_find_node(target_id).await {
+                match self.kademlia.iterative_find_node(target_id).await {
                     Ok(contacts) => {
                         println!("Found contacts: {:?}", contacts);
                     }
@@ -75,6 +74,7 @@ impl Cli {
                         println!("Error finding node: {}", err);
                     }
                 }
+                CMDStatus::CONTINUE
             }
             Command::EXIT => {
                 println!("Exiting...");

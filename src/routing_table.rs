@@ -39,11 +39,13 @@ impl RoutingTable {
         let index: usize = self.get_bucket_index(contact.id.clone());
         match &mut self.buckets[index] {
             Some(bucket) => {
-                bucket.add_contact(contact);
+                // Pass the contact by reference to add_contact
+                bucket.add_contact(&contact, contact.id);
             }
             None => {
                 let mut bucket = Bucket::new();
-                bucket.add_contact(contact);
+                // Pass the contact by reference to add_contact
+                bucket.add_contact(&contact, contact.id);
                 self.buckets[index] = Some(bucket);
             }
         }

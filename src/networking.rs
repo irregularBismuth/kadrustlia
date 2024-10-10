@@ -81,7 +81,7 @@ impl Networking {
         let socket = UdpSocket::bind(bind_addr).await?;
         println!("Listening for RPC messages on {}", bind_addr);
 
-        let mut buf = [0u8; 1024];
+        let mut buf = [0u8; 65507];
 
         loop {
             let (len, src) = socket.recv_from(&mut buf).await?;

@@ -141,14 +141,17 @@ impl Networking {
 
                             if let Some(contacts) = reply_rx.recv().await {
                                 let src_ip = src.to_string();
-                                Networking::send_rpc_response(
-                                    &src_ip,
-                                    Command::FINDNODE,
-                                    id,
-                                    None,
-                                    Some(contacts),
-                                )
-                                .await?;
+                                tokio::spawn(async move {
+                                    Networking::send_rpc_response(
+                                        &src_ip,
+                                        Command::FINDNODE,
+                                        id,
+                                        None,
+                                        Some(contacts),
+                                    )
+                                    .await
+                                    .expect("no response was sent");
+                                });
                             } else {
                                 println!("no conacts from routing table");
                             }

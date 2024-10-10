@@ -138,7 +138,7 @@ impl Networking {
                     Command::FINDVALUE => {
                         println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
 
-                        let src_ip = src.to_string();
+                        /*let src_ip = src.to_string();
                         tokio::spawn(async move {
                             Networking::send_rpc_response(
                                 &src_ip,
@@ -149,9 +149,9 @@ impl Networking {
                             )
                             .await
                             .expect("no response was sent");
-                        });
+                        });*/
 
-                        /*if let Some(target_id) = target_id {
+                        if let Some(target_id) = target_id {
                             let dir = "data";
                             let filename = format!("{}/{}.txt", dir, target_id.to_hex());
 
@@ -196,7 +196,7 @@ impl Networking {
                             }
                         } else {
                             println!("{:?} request missing target_id", method);
-                        }*/
+                        }
                     }
                     Command::STORE => {
                         println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());

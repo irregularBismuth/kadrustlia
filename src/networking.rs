@@ -208,6 +208,14 @@ impl Networking {
                                     let contacts_cp = contacts.clone();
                                     println!("contacts: {:?}", contacts_cp);
                                     let src_ip = src.to_string();
+                                    let id_hex = &id.to_hex();
+                                    println!("id_hex: {}", id_hex);
+
+                                    for i in contacts.iter() {
+                                        let kadid = i.id.to_hex();
+                                        println!("kadid: {}", kadid);
+                                    }
+
                                     tokio::spawn(async move {
                                         Networking::send_rpc_response(
                                             &src_ip,
@@ -237,7 +245,6 @@ impl Networking {
                         if let Some(data) = data {
                             let mut kad_id = KademliaID::new();
                             kad_id.store_data(data).await;
-
                             let src_ip = src.ip().to_string();
                             tokio::spawn(async move {
                                 Networking::send_rpc_response(
@@ -300,6 +307,14 @@ impl Networking {
                             println!("value found: {}", value);
                         } else if let Some(contacts) = contact {
                             println!("contacts: {:?}", contacts);
+                            let id_hex = &id.to_hex();
+                            println!("id_hex: {}", id_hex);
+
+                            for i in contacts.iter() {
+                                let kadid = i.id.to_hex();
+                                println!("kadid: {}", kadid);
+                            }
+
                             for contact in &contacts {
                                 let _ = tx.send(RouteTableCMD::AddContact(contact.clone())).await;
                             }

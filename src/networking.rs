@@ -1,7 +1,7 @@
 use {
     crate::{
-        constants::rpc::Command, contact::Contact, routing_table_handler::*,
-        kademlia_id::KademliaID, rpc::RpcMessage,
+        constants::rpc::Command, contact::Contact, kademlia_id::KademliaID,
+        routing_table_handler::*, rpc::RpcMessage,
     },
     bincode::{deserialize, serialize},
     tokio::net::{lookup_host, ToSocketAddrs, UdpSocket},
@@ -98,12 +98,19 @@ impl Networking {
                     contact,
                 } => match method {
                     Command::PING => {
-                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Request from {} rpc id {}",
+                            method,
+                            src,
+                            id.to_hex()
+                        );
                         let src_ip = src.ip().to_string();
                         let dest_cp = src_ip.clone();
                         let dest_cp_cp = src_ip.clone();
 
-                        let _ = tx.send(RouteTableCMD::AddContact(Contact::new(id, dest_cp))).await;
+                        let _ = tx
+                            .send(RouteTableCMD::AddContact(Contact::new(id, dest_cp)))
+                            .await;
                         //let _ = tx.send(RouteTableCMD::GetClosestNodes(id)).await;
                         tokio::spawn(async move {
                             Networking::send_rpc_response(&src_ip, Command::PONG, id, None, None)
@@ -114,7 +121,12 @@ impl Networking {
                         println!("Sent PONG to {}", dest_cp_cp);
                     }
                     Command::FINDNODE => {
-                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Request from {} rpc id {}",
+                            method,
+                            src,
+                            id.to_hex()
+                        );
 
                         //let Some(data) = target;
 
@@ -123,11 +135,23 @@ impl Networking {
                         if let Some(target_id) = target_id {
                             let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
 
-                            let _ = tx.send(RouteTableCMD::GetClosestNodes(target_id, reply_tx)).await;
+                            let _ = tx
+                                .send(RouteTableCMD::GetClosestNodes(target_id, reply_tx))
+                                .await;
 
                             if let Some(contacts) = reply_rx.recv().await {
                                 let src_ip = src.to_string();
-                                Networking::send_rpc_response(&src_ip, Command::FINDNODE, id, None, Some(contacts)).await?;
+                                tokio::spawn(async move {
+                                    Networking::send_rpc_response(
+                                        &src_ip,
+                                        Command::FINDNODE,
+                                        id,
+                                        None,
+                                        Some(contacts),
+                                    )
+                                    .await
+                                    .expect("no response was sent");
+                                });
                             } else {
                                 println!("no conacts from routing table");
                             }
@@ -136,7 +160,12 @@ impl Networking {
                         }
                     }
                     Command::FINDVALUE => {
-                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Request from {} rpc id {}",
+                            method,
+                            src,
+                            id.to_hex()
+                        );
 
                         /*let src_ip = src.to_string();
                         tokio::spawn(async move {
@@ -199,7 +228,12 @@ impl Networking {
                         }
                     }
                     Command::STORE => {
-                        println!("Recived {:?} Request from {} rpc id {}", method, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Request from {} rpc id {}",
+                            method,
+                            src,
+                            id.to_hex()
+                        );
                         if let Some(data) = data {
                             let mut kad_id = KademliaID::new();
                             kad_id.store_data(data).await;
@@ -231,10 +265,20 @@ impl Networking {
                     contact,
                 } => match result {
                     Command::PONG => {
-                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Response from {} rpc id {}",
+                            result,
+                            src,
+                            id.to_hex()
+                        );
                     }
                     Command::FINDNODE => {
-                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Response from {} rpc id {}",
+                            result,
+                            src,
+                            id.to_hex()
+                        );
 
                         if let Some(contacts) = contact {
                             for contact in &contacts {
@@ -245,7 +289,12 @@ impl Networking {
                         }
                     }
                     Command::FINDVALUE => {
-                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Response from {} rpc id {}",
+                            result,
+                            src,
+                            id.to_hex()
+                        );
 
                         if let Some(value) = data {
                             println!("value found: {}", value);
@@ -259,10 +308,19 @@ impl Networking {
                         }
                     }
                     Command::STORE => {
-                        println!("Recived {:?} Response from {} rpc id {}", result, src, id.to_hex());
+                        println!(
+                            "Recived {:?} Response from {} rpc id {}",
+                            result,
+                            src,
+                            id.to_hex()
+                        );
                     }
                     _ => {
-                        println!("Received Response with ID {} and result: {:?}", id.to_hex(), result);
+                        println!(
+                            "Received Response with ID {} and result: {:?}",
+                            id.to_hex(),
+                            result
+                        );
                     }
                 },
                 RpcMessage::Error { id, message } => {

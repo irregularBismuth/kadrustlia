@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ::tokio::io::{self, AsyncBufReadExt, AsyncWriteExt};
 
 use crate::{kademlia::{self, Kademlia}, kademlia_id::KademliaID};
@@ -8,11 +10,19 @@ enum Command {
     EXIT,
 }
 #[derive(Clone)]
-pub struct Cli {}
+pub struct Cli {
+    kademlia: Arc<Kademlia>,
+    shutdown_tx: tokio::sync::broadcast::Sender<()>,
+}
+
+enum CMDStatus {
+    CONTINUE,
+    EXIT,
+}
 
 impl Cli {
-    pub fn new() -> Self {
-        Cli {}
+    pub fn new(kademlia: Arc<Kademlia>, shutdown_tx: tokio::sync::broadcast::Sender<()>) -> Self {
+        Cli { kademlia, shutdown_tx }
     }
 
     pub async fn read_input(&self) {
@@ -27,12 +37,9 @@ impl Cli {
 
                 match self.parse_command(&input) {
                     Ok(command) => {
-                        if let Command::EXIT = command {
-                            println!("bombaclat node");
-                            return;
+                        if let CMDStatus::EXIT = self.execute_command(command).await {
                             break;
                         }
-                        self.execute_command(command).await;
                     }
                     Err(e) => {
                         println!("Error: {}", e);
@@ -42,22 +49,21 @@ impl Cli {
         }
     }
 
-    async fn execute_command(&self, cmd: Command) {
+    async fn execute_command(&self, cmd: Command) -> CMDStatus {
         match cmd {
             Command::GET(hash) => {
                 //let target_id = KademliaID::from_hex(hash);
-                let kademlia = Kademlia::new();
-                kademlia.find_value(KademliaID::new()).await.unwrap();
+                self.kademlia.find_value(KademliaID::new()).await.unwrap();
+                CMDStatus::CONTINUE
             }
             Command::PUT(data) => {
-                let kademlia = Kademlia::new();
-                kademlia.store(data).await.unwrap();
-
-                // let data = data.as_bytes().to_vec();
-                //client.store(data).await.unwrap();
+                self.kademlia.store(data).await.unwrap();
+                CMDStatus::CONTINUE
             }
             Command::EXIT => {
                 println!("Exiting...");
+                let _ = self.shutdown_tx.send(());
+                CMDStatus::EXIT
             }
         }
     }

@@ -1,19 +1,11 @@
 use {
-    axum::{http::StatusCode, routing::get, Json, Router},
+    axum::{routing::get, Router},
     kadrustlia::{
         cli::Cli,
-        constants::{rpc::Command, ALL_IPV4},
-        contact::Contact,
+        constants::ALL_IPV4,
         kademlia::Kademlia,
-        kademlia_id::KademliaID,
-        networking::Networking,
-        rpc::RpcMessage,
-        utils,
     },
-    std::net::SocketAddr,
     std::sync::Arc,
-    tokio::net::ToSocketAddrs,
-    tokio::sync::Mutex,
 };
 
 async fn root() -> &'static str {
@@ -33,18 +25,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let bind_addr = format!("{}:{}", ALL_IPV4, "5678");
 
-    let kademlia = Kademlia::new();
-    let kademlia_c = kademlia.clone();
-    let kademlia_c2 = kademlia.clone();
+    let kademlia = Arc::new(Kademlia::new());
+
+    let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
+
+    let kademlia_listen = Arc::clone(&kademlia);
+    let mut shutdown_rx = shutdown_tx.subscribe();
     let listen_task = tokio::spawn(async move {
-        kademlia.listen(&bind_addr).await;
+        tokio::select! {
+            _ = kademlia_listen.listen(&bind_addr) => {},
+            _ = shutdown_rx.recv() => {
+                println!("shutting down listen task...");
+            },
+        }
     });
+
+    let kademlia_join = Arc::clone(&kademlia);
     let join_task = tokio::spawn(async move {
-        kademlia_c.join().await;
+        kademlia_join.join().await;
     });
-    let join_task_2 = tokio::spawn(async move {
-        kademlia_c2.start_cli().await;
+
+    let kademlia_cli = Arc::clone(&kademlia);
+    let cli = Cli::new(kademlia_cli, shutdown_tx.clone());
+    let cli_task = tokio::spawn(async move {
+        cli.read_input().await;
     });
-    let _ = tokio::join!(listen_task, join_task, join_task_2);
+
+    let _ = tokio::join!(listen_task, join_task, cli_task);
     Ok(())
 }

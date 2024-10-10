@@ -1,6 +1,6 @@
 use {
     crate::{
-        cli::Cli, constants::{rpc::Command, BUCKET_SIZE}, contact::Contact, kademlia_id::KademliaID,
+        constants::{rpc::Command, BUCKET_SIZE}, contact::Contact, kademlia_id::KademliaID,
         networking::Networking, routing_table::RoutingTable, utils, routing_table_handler::*,
     },
     tokio::sync::mpsc,
@@ -9,7 +9,6 @@ use {
 #[derive(Clone)]
 pub struct Kademlia {
     route_table_tx: mpsc::Sender<RouteTableCMD>,
-    cli: Cli,
 }
 
 impl Kademlia {
@@ -26,7 +25,6 @@ impl Kademlia {
         });
 
         Self {
-            cli: Cli::new(),
             route_table_tx: tx,
         }
     }
@@ -49,33 +47,26 @@ impl Kademlia {
             .expect("failed to send PING");
     }
 
-    pub async fn find_node(self, target_id: KademliaID) -> std::io::Result<()> {
-        
-
+    pub async fn find_node(&self, target_id: KademliaID) -> std::io::Result<()> {
+        // Implement find node logic
         Ok(())
     }
 
-    pub async fn find_value(self, target_id: KademliaID) -> std::io::Result<()> {
-        //let target_id = KademliaID::new();
+    pub async fn find_value(&self, target_id: KademliaID) -> std::io::Result<()> {
         let adr: String = utils::boot_node_address();
         let boot_node_addr: String = format!("{}:{}", adr, "5678");
-        Networking::send_rpc_request(&boot_node_addr, Command::FINDVALUE, Some(target_id), None, None).await.expect("failed");
-        
-        println!("ben");
-        //Networking::send_rpc_request(target_addr, cmd, data, contact);
+        Networking::send_rpc_request(&boot_node_addr, Command::FINDVALUE, Some(target_id), None, None)
+            .await
+            .expect("failed");
 
+        println!("Value found or contacts returned");
         Ok(())
     }
 
-    pub async fn store(self, data: String) -> std::io::Result<()> {
+    pub async fn store(&self, data: String) -> std::io::Result<()> {
         let mut kad_id = KademliaID::new();
         kad_id.store_data(data.clone()).await;
         println!("Data stored with kademlia id: {}", kad_id.to_hex());
-
         Ok(())
-    }
-
-    pub async fn start_cli(&self) {
-        self.cli.read_input().await;
     }
 }

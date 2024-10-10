@@ -270,7 +270,5 @@ impl Networking {
                 }
             }
         }
-
-        println!("------------------OUT OF LOOP------------------");
     }
 }

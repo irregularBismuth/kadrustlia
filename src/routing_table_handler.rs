@@ -1,11 +1,17 @@
 use tokio::sync::mpsc;
 
-use crate::{constants::{ALPHA, BUCKET_SIZE}, contact::Contact, kademlia_id::KademliaID, routing_table::RoutingTable};
+use crate::{
+    constants::{ALPHA, BUCKET_SIZE},
+    contact::Contact,
+    kademlia_id::KademliaID,
+    routing_table::RoutingTable,
+};
 
 pub enum RouteTableCMD {
     AddContact(Contact),
     RemoveContact(KademliaID),
     GetClosestNodes(KademliaID, mpsc::Sender<Vec<Contact>>),
+    GetBucketIndex(KademliaID, mpsc::Sender<usize>),
 }
 
 pub async fn routing_table_handler(
@@ -28,6 +34,10 @@ pub async fn routing_table_handler(
                 //println!("target_id: {:?}", target_id);
                 //println!("contacts: {:?}", contacts);
                 let _ = reply.send(contacts).await;
+            }
+            RouteTableCMD::GetBucketIndex(kad_id, reply) => {
+                let index = routing_table.get_bucket_index(kad_id);
+                let _ = reply.send(index).await;
             }
         }
     }

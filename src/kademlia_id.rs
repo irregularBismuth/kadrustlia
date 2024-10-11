@@ -21,6 +21,43 @@ impl KademliaID {
         Self { id }
     }
 
+    pub fn generate_random_id_in_bucket(&self, bucket_index: usize) -> Self {
+        let mut rng = rand::thread_rng();
+        let mut id = self.id;
+
+        let num_bits = bucket_index;
+        let num_full_bytes = num_bits / 8;
+        let num_bits_in_partial_byte = num_bits % 8;
+
+        for i in 0..num_full_bytes {
+            id[i] = self.id[i];
+        }
+
+        if num_bits_in_partial_byte > 0 && num_full_bytes < ID_LENGTH {
+            let mask = 0xff << (8 - num_bits_in_partial_byte);
+            id[num_full_bytes] = self.id[num_full_bytes] & mask;
+        }
+
+        let byte_index = num_bits / 8;
+        let bit_index = num_bits % 8;
+        if byte_index < ID_LENGTH {
+            id[byte_index] ^= 1 << (7 - bit_index);
+        }
+
+        for bit in (bucket_index + 1)..(ID_LENGTH * 8) {
+            let byte_index = bit / 8;
+            let bit_index = bit % 8;
+            let random_bit = rng.gen::<bool>();
+            if random_bit {
+                id[byte_index] |= 1 << (7 - bit_index);
+            } else {
+                id[byte_index] &= !(1 << (7 - bit_index));
+            }
+        }
+
+        KademliaID::with_id(id)
+    }
+
     pub fn from_hex(hex: String) -> Self {
         let id: KadId = hex
             .as_bytes()

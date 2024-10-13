@@ -267,4 +267,38 @@ impl Kademlia {
         println!("Data stored with kademlia id: {}", kad_id.to_hex());
         Ok(())
     }
+
+    pub async fn iterative_store(&self, target_id: KademliaID, data: String) -> std::io::Result<()> {
+        println!("Starting iterative store for target ID: {}", target_id.to_hex());
+
+        // Step 1: Find the k closest nodes to the target ID using iterative_find_node
+        let closest_nodes = self.iterative_find_node(target_id.clone()).await?;
+        
+        if closest_nodes.is_empty() {
+            println!("No contacts found to store data.");
+            return Ok(());
+        }
+
+        // Step 2: Send STORE RPC to each of the closest nodes
+        for contact in closest_nodes {
+            let target_addr = format!("{}:{}", contact.address, "5678");
+            println!("Storing data at contact: {} ({})", contact.id.to_hex(), target_addr);
+            
+            let store_result = Networking::send_rpc_request(
+                self.own_id.clone(),
+                &target_addr,
+                Command::STORE,
+                Some(target_id.clone()),
+                Some(data.clone()),  // Send the data to be stored
+                None
+            ).await;
+
+            match store_result {
+                Ok(_) => println!("Successfully stored data at {}", contact.id.to_hex()),
+                Err(e) => println!("Failed to store data at {}: {}", contact.id.to_hex(), e),
+            }
+        }
+
+        Ok(())
+    }
 }

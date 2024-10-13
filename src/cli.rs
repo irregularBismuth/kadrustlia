@@ -61,8 +61,11 @@ impl Cli {
                 CMDStatus::CONTINUE
             }
             Command::PUT(data) => {
-                self.kademlia.store(data).await.unwrap();
+                let target_id = KademliaID::new();
+                self.kademlia.iterative_store(target_id, data).await.unwrap();
                 CMDStatus::CONTINUE
+
+                //self.kademlia.store(data).await.unwrap();
             }
             Command::FINDNODE(target_id_hex) => {
                 let target_id = KademliaID::from_hex(target_id_hex);

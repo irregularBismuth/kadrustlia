@@ -1,10 +1,6 @@
 use {
     axum::{routing::get, Router},
-    kadrustlia::{
-        cli::Cli,
-        constants::ALL_IPV4,
-        kademlia::Kademlia,
-    },
+    kadrustlia::{cli::Cli, constants::ALL_IPV4, kademlia::Kademlia},
     std::sync::Arc,
 };
 
@@ -42,7 +38,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let kademlia_join = Arc::clone(&kademlia);
     let join_task = tokio::spawn(async move {
-        kademlia_join.join().await;
+        if let Err(e) = kademlia_join.join().await {
+            eprintln!("Error during join: {}", e);
+        }
     });
 
     let kademlia_cli = Arc::clone(&kademlia);

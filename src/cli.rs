@@ -2,11 +2,12 @@ use std::sync::Arc;
 
 use ::tokio::io::{self, AsyncBufReadExt, AsyncWriteExt};
 
-use crate::{kademlia::{self, Kademlia}, kademlia_id::KademliaID};
+use crate::{kademlia::Kademlia, kademlia_id::KademliaID};
 
 enum Command {
     GET(String),
     PUT(String),
+    FINDNODE(String),
     EXIT,
 }
 #[derive(Clone)]
@@ -22,7 +23,10 @@ enum CMDStatus {
 
 impl Cli {
     pub fn new(kademlia: Arc<Kademlia>, shutdown_tx: tokio::sync::broadcast::Sender<()>) -> Self {
-        Cli { kademlia, shutdown_tx }
+        Cli {
+            kademlia,
+            shutdown_tx,
+        }
     }
 
     pub async fn read_input(&self) {
@@ -60,6 +64,18 @@ impl Cli {
                 self.kademlia.store(data).await.unwrap();
                 CMDStatus::CONTINUE
             }
+            Command::FINDNODE(target_id_hex) => {
+                let target_id = KademliaID::from_hex(target_id_hex);
+                match self.kademlia.iterative_find_node(target_id).await {
+                    Ok(contacts) => {
+                        println!("Found contacts: {:?}", contacts);
+                    }
+                    Err(err) => {
+                        println!("Error finding node: {}", err);
+                    }
+                }
+                CMDStatus::CONTINUE
+            }
             Command::EXIT => {
                 println!("Exiting...");
                 let _ = self.shutdown_tx.send(());
@@ -85,6 +101,13 @@ impl Cli {
                     Ok(Command::PUT(arg.to_string()))
                 } else {
                     Err("PUT: missing data argument")
+                }
+            }
+            "findnode" => {
+                if let Some(arg) = parts.next() {
+                    Ok(Command::FINDNODE(arg.to_string()))
+                } else {
+                    Err("FINDNODE: missing target_id argument")
                 }
             }
             "exit" => Ok(Command::EXIT),

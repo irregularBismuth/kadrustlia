@@ -39,11 +39,13 @@ impl RoutingTable {
         let index: usize = self.get_bucket_index(contact.id.clone());
         match &mut self.buckets[index] {
             Some(bucket) => {
-                bucket.add_contact(contact);
+                // Pass the contact by reference to add_contact
+                bucket.add_contact(&contact, contact.id);
             }
             None => {
                 let mut bucket = Bucket::new();
-                bucket.add_contact(contact);
+                // Pass the contact by reference to add_contact
+                bucket.add_contact(&contact, contact.id);
                 self.buckets[index] = Some(bucket);
             }
         }
@@ -59,7 +61,7 @@ impl RoutingTable {
         }
 
         let mut i = 1;
-        while (bucket_index as isize - i as isize >= 0 || bucket_index + i < ID_LENGTH * 8)
+        while (bucket_index as isize - i as isize >= 0 || bucket_index + i < RT_BCKT_SIZE)
             && candidates.len() < count
         {
             if bucket_index >= i {
@@ -69,7 +71,7 @@ impl RoutingTable {
                 }
             }
 
-            if bucket_index + i < ID_LENGTH * 8 {
+            if bucket_index + i < RT_BCKT_SIZE {
                 if let Some(bucket_) = self.buckets[bucket_index + i].as_mut() {
                     let mut cntcs = bucket_.get_contact_and_calc_distance(target);
                     candidates.append(&mut cntcs);

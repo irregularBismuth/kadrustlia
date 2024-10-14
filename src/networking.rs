@@ -4,8 +4,10 @@ use {
         routing_table_handler::*, rpc::RpcMessage,
     },
     bincode::{deserialize, serialize},
+    std::time::Duration,
     tokio::net::{lookup_host, ToSocketAddrs, UdpSocket},
     tokio::sync::mpsc,
+    tokio::time::timeout,
 };
 
 pub struct Networking;
@@ -76,8 +78,43 @@ impl Networking {
         Ok(())
     }
 
+    pub async fn send_rpc_request_and_await_response(
+        own_id: KademliaID,
+        target_addr: &str,
+        cmd: Command,
+        target_id: Option<KademliaID>,
+        data: Option<String>,
+        contact: Option<Vec<Contact>>,
+    ) -> std::io::Result<RpcMessage> {
+        let socket = UdpSocket::bind("0.0.0.0:0").await?;
+        let rpc_msg = RpcMessage::Request {
+            id: own_id,
+            method: cmd,
+            target_id,
+            data,
+            contact,
+        };
+        for addr in lookup_host(target_addr).await? {
+            let bin_data = bincode::serialize(&rpc_msg).expect("failed to serialize data");
+            socket.send_to(&bin_data, &addr).await?;
+            println!("Sent {:?} to {}", cmd, &addr);
+
+            // Now wait for response
+            let mut buf = [0u8; 65507];
+            let (len, _) = timeout(Duration::from_secs(5), socket.recv_from(&mut buf)).await??;
+            let response_msg: RpcMessage =
+                bincode::deserialize(&buf[..len]).expect("failed to deserialize data");
+            return Ok(response_msg);
+        }
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "No address resolved",
+        ))
+    }
+
     pub async fn listen_for_rpc(
         mut tx: mpsc::Sender<RouteTableCMD>,
+        own_id: KademliaID,
         bind_addr: &str,
     ) -> std::io::Result<()> {
         let socket = UdpSocket::bind(bind_addr).await?;
@@ -109,7 +146,7 @@ impl Networking {
                         let src_ip = src.ip().to_string();
                         let dest_cp = src_ip.clone();
                         let dest_cp_cp = src_ip.clone();
-                        let own_id_copy = id.clone();
+                        let own_id_copy = own_id.clone();
 
                         let _ = tx
                             .send(RouteTableCMD::AddContact(Contact::new(id, dest_cp)))

@@ -1,15 +1,19 @@
 use {
     crate::{
         constants::{rpc::Command, ALPHA, BUCKET_SIZE, RT_BCKT_SIZE},
-        contact::Contact,
+        contact::{self, Contact},
         kademlia_id::KademliaID,
         networking::Networking,
         routing_table::RoutingTable,
         routing_table_handler::*,
+        rpc::RpcMessage,
         utils,
     },
-    std::collections::HashSet,
-    tokio::{sync::mpsc, task},
+    std::collections::{HashMap, HashSet},
+    tokio::{
+        sync::mpsc::{self, Receiver, Sender},
+        task,
+    },
 };
 
 #[derive(Clone)]
@@ -39,7 +43,9 @@ impl Kademlia {
 
     pub async fn listen(&self, addr: &str) {
         let tx = self.route_table_tx.clone();
-        let _ = Networking::listen_for_rpc(tx, addr).await;
+        let own_id = self.own_id.clone();
+        let _ = Networking::listen_for_rpc(tx, own_id, addr).await;
+        // let _ = Networking::listen_for_rpc(tx, addr).await;
     }
 
     pub async fn join(&self) -> std::io::Result<()> {
@@ -238,27 +244,139 @@ impl Kademlia {
         Ok(active_contacts)
     }
 
-    pub async fn find_value(&self, target_id: KademliaID) -> std::io::Result<()> {
-        //let target_id = KademliaID::new();
-        let adr: String = utils::boot_node_address();
-        let boot_node_addr: String = format!("{}:{}", adr, "5678");
-        let own_id_copy = self.own_id.clone();
-        Networking::send_rpc_request(
-            own_id_copy,
-            &boot_node_addr,
-            Command::FINDVALUE,
-            Some(target_id),
-            None,
-            None,
-        )
-        .await
-        .expect("failed");
+    // pub async fn find_value(&self, target_id: KademliaID) -> std::io::Result<()> {
+    //     //let target_id = KademliaID::new();
+    //     let adr: String = utils::boot_node_address();
+    //     let boot_node_addr: String = format!("{}:{}", adr, "5678");
+    //     let own_id_copy = self.own_id.clone();
+    //     Networking::send_rpc_request(
+    //         own_id_copy,
+    //         &boot_node_addr,
+    //         Command::FINDVALUE,
+    //         Some(target_id),
+    //         None,
+    //         None,
+    //     )
+    //     .await
+    //     .expect("failed");
 
-        println!("ben");
-        //Networking::send_rpc_request(target_addr, cmd, data, contact);
+    //     println!("ben");
+    //     //Networking::send_rpc_request(target_addr, cmd, data, contact);
 
-        println!("Value found or contacts returned");
-        Ok(())
+    //     println!("Value found or contacts returned");
+    //     Ok(())
+    // }
+
+    pub async fn find_value(
+        &self,
+        target_id: KademliaID,
+    ) -> std::io::Result<Option<(String, Contact)>> {
+        println!(
+            "Starting iterative find value for target ID: {}",
+            target_id.to_hex()
+        );
+
+        let mut shortlist: Vec<(Contact, bool)> = Vec::new();
+
+        // Get initial contacts from the routing table
+        let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
+        let _ = self
+            .route_table_tx
+            .send(RouteTableCMD::GetClosestNodes(target_id, reply_tx))
+            .await;
+
+        if let Some(initial_contacts) = reply_rx.recv().await {
+            for contact in initial_contacts.into_iter().take(BUCKET_SIZE) {
+                shortlist.push((contact, false));
+            }
+        }
+
+        let queried_nodes: HashSet<KademliaID> = HashSet::new();
+
+        while !shortlist.is_empty() {
+            let unqueried_contacts: Vec<Contact> = shortlist
+                .iter()
+                .filter(|(contact, queried)| !*queried && !queried_nodes.contains(&contact.id))
+                .take(BUCKET_SIZE)
+                .map(|(contact, _)| contact.clone())
+                .collect();
+
+            if unqueried_contacts.is_empty() {
+                println!("No more unqueried contacts left in shortlist. Ending lookup.");
+                break;
+            }
+
+            let mut tasks = vec![];
+            for contact in unqueried_contacts.iter().take(ALPHA) {
+                println!("Querying contact: {}", contact.id.to_hex());
+                let target_addr = format!("{}:{}", contact.address, "5678");
+                let target_id_copy = target_id.clone();
+                let own_id_copy = self.own_id.clone();
+                let contact_clone = contact.clone();
+                let task = tokio::spawn(async move {
+                    let response = Networking::send_rpc_request_and_await_response(
+                        own_id_copy,
+                        &target_addr,
+                        Command::FINDVALUE,
+                        Some(target_id_copy),
+                        None,
+                        None,
+                    )
+                    .await;
+                    (response, contact_clone)
+                });
+                tasks.push(task);
+            }
+
+            let mut found_value = None;
+
+            for task in tasks {
+                if let Ok((Ok(response), contact)) = task.await {
+                    match response {
+                        RpcMessage::Response {
+                            id: _,
+                            result,
+                            data,
+                            contact: contacts,
+                        } => {
+                            if result == Command::FINDVALUE {
+                                if let Some(value) = data {
+                                    // Value found
+                                    println!("Value found at node {}", contact.id.to_hex());
+                                    found_value = Some((value, contact.clone()));
+                                    break;
+                                } else if let Some(new_contacts) = contacts {
+                                    // No value, but received contacts
+                                    for new_contact in new_contacts {
+                                        if !shortlist.iter().any(|(c, _)| c.id == new_contact.id) {
+                                            shortlist.push((new_contact, false));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        _ => {
+                            println!("Unexpected response {:?}", response);
+                        }
+                    }
+                } else {
+                    println!("Failed to receive response");
+                }
+            }
+
+            if let Some((value, contact)) = found_value {
+                return Ok(Some((value, contact)));
+            }
+
+            for contact in &mut shortlist {
+                if unqueried_contacts.iter().any(|c| c.id == contact.0.id) {
+                    contact.1 = true;
+                }
+            }
+        }
+
+        println!("Value not found");
+        Ok(None)
     }
 
     pub async fn store(&self, data: String) -> std::io::Result<()> {

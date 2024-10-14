@@ -114,6 +114,7 @@ impl Networking {
 
     pub async fn listen_for_rpc(
         mut tx: mpsc::Sender<RouteTableCMD>,
+        own_id: KademliaID,
         bind_addr: &str,
     ) -> std::io::Result<()> {
         let socket = UdpSocket::bind(bind_addr).await?;
@@ -145,7 +146,7 @@ impl Networking {
                         let src_ip = src.ip().to_string();
                         let dest_cp = src_ip.clone();
                         let dest_cp_cp = src_ip.clone();
-                        let own_id_copy = id.clone();
+                        let own_id_copy = own_id.clone();
 
                         let _ = tx
                             .send(RouteTableCMD::AddContact(Contact::new(id, dest_cp)))

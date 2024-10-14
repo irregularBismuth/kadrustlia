@@ -1,7 +1,7 @@
 use {
     crate::{
         constants::{rpc::Command, ALPHA, BUCKET_SIZE, RT_BCKT_SIZE},
-        contact::Contact,
+        contact::{self, Contact},
         kademlia_id::KademliaID,
         networking::Networking,
         routing_table::RoutingTable,
@@ -43,7 +43,8 @@ impl Kademlia {
 
     pub async fn listen(&self, addr: &str) {
         let tx = self.route_table_tx.clone();
-        let _ = Networking::listen_for_rpc(tx, addr).await;
+        let own_id = self.own_id.clone();
+        let _ = Networking::listen_for_rpc(tx, own_id, addr).await;
     }
 
     pub async fn join(&self) -> std::io::Result<()> {
@@ -56,7 +57,7 @@ impl Kademlia {
 
         let own_contact = Contact::new(self.own_id.clone(), utils::get_own_address());
 
-        Networking::send_rpc_request(
+        let response = Networking::send_rpc_request_and_await_response(
             self.own_id.clone(),
             &boot_node_addr,
             Command::PING,
@@ -64,8 +65,20 @@ impl Kademlia {
             None,
             Some(vec![own_contact]),
         )
-        .await
-        .expect("Failed to send PING");
+        .await;
+
+        match response {
+            Ok(RpcMessage::Response { result, .. }) if result == Command::PONG => {
+                println!("Received PONG from boot node");
+            }
+            Ok(_) => {
+                println!("Received unexpected response");
+            }
+            Err(e) => {
+                println!("Failed to receive PONG: {}", e);
+                return Err(e);
+            }
+        }
 
         let contacts = self.iterative_find_node(self.own_id.clone()).await?;
 
@@ -134,13 +147,14 @@ impl Kademlia {
             }
 
             let mut tasks = vec![];
-            for contact in unqueried_contacts.iter().take(ALPHA) {
+            for contact in unqueried_contacts.clone().into_iter().take(ALPHA) {
                 println!("Querying contact: {}", contact.id.to_hex());
                 let target_addr = format!("{}:{}", contact.address, "5678");
                 let target_id_copy = target_id.clone();
                 let own_id_copy = self.own_id.clone();
+                let contact_clone = contact.clone();
                 let task = tokio::spawn(async move {
-                    Networking::send_rpc_request(
+                    let response = Networking::send_rpc_request_and_await_response(
                         own_id_copy,
                         &target_addr,
                         Command::FINDNODE,
@@ -148,51 +162,52 @@ impl Kademlia {
                         None,
                         None,
                     )
-                    .await
+                    .await;
+                    (response, contact_clone)
                 });
-                tasks.push((task, contact.clone()));
+                tasks.push((task, contact));
             }
 
-            for (task, queried_contact) in tasks {
-                if let Ok(Ok(())) = task.await {
-                    println!(
-                        "Received response from contact: {}",
-                        queried_contact.id.to_hex()
-                    );
+            for task in tasks {
+                if let Ok((Ok(response), contact)) = task.0.await {
+                    match response {
+                        RpcMessage::Response {
+                            id: _,
+                            result,
+                            data: _,
+                            contact: contacts_option,
+                        } => {
+                            if result == Command::FINDNODE {
+                                if let Some(new_contacts) = contacts_option {
+                                    for new_contact in new_contacts {
+                                        // Calculate distance to target
+                                        let distance = new_contact.id.distance(&target_id);
 
-                    if let Some(received_contacts) = reply_rx.recv().await {
-                        for new_contact in received_contacts {
-                            println!(
-                                "Received new contact: {} from response",
-                                new_contact.id.to_hex()
-                            );
-                            let distance = new_contact.id.distance(&target_id);
+                                        // Update closest node seen
+                                        if distance.less(&closest_distance) {
+                                            closest_node_seen = Some(new_contact.clone());
+                                            closest_distance = distance;
+                                        }
 
-                            if distance.less(&closest_distance) {
-                                println!(
-                                    "Found closer contact: {} with distance {}",
-                                    new_contact.id.to_hex(),
-                                    distance.to_hex()
-                                );
-                                closest_node_seen = Some(new_contact.clone());
-                                closest_distance = distance;
+                                        // Add new contact to shortlist if not already present
+                                        if !shortlist.iter().any(|(c, _)| c.id == new_contact.id) {
+                                            shortlist.push((new_contact, false));
+                                        }
+                                    }
+                                }
                             }
-
-                            if !shortlist.iter().any(|(c, _)| c.id == new_contact.id) {
-                                println!(
-                                    "Adding new contact: {} to shortlist",
-                                    new_contact.id.to_hex()
-                                );
-                                shortlist.push((new_contact, false));
-                            }
+                        }
+                        _ => {
+                            println!("Unexpected response {:?}", response);
                         }
                     }
                 } else {
                     println!(
-                        "Failed to receive response from contact: {}. Marking as unreachable.",
-                        queried_contact.id.to_hex()
+                        "Failed to receive response from contact: {}",
+                        task.1.id.to_hex()
                     );
-                    shortlist.retain(|(contact, _)| contact.id != queried_contact.id);
+                    // Remove unreachable contact from shortlist
+                    shortlist.retain(|(c, _)| c.id != task.1.id);
                 }
             }
 
@@ -390,12 +405,19 @@ impl Kademlia {
         Ok(())
     }
 
-    pub async fn iterative_store(&self, target_id: KademliaID, data: String) -> std::io::Result<()> {
-        println!("Starting iterative store for target ID: {}", target_id.to_hex());
+    pub async fn iterative_store(
+        &self,
+        target_id: KademliaID,
+        data: String,
+    ) -> std::io::Result<()> {
+        println!(
+            "Starting iterative store for target ID: {}",
+            target_id.to_hex()
+        );
 
         // Step 1: Find the k closest nodes to the target ID using iterative_find_node
         let closest_nodes = self.iterative_find_node(target_id.clone()).await?;
-        
+
         if closest_nodes.is_empty() {
             println!("No contacts found to store data.");
             return Ok(());
@@ -404,16 +426,21 @@ impl Kademlia {
         // Step 2: Send STORE RPC to each of the closest nodes
         for contact in closest_nodes {
             let target_addr = format!("{}:{}", contact.address, "5678");
-            println!("Storing data at contact: {} ({})", contact.id.to_hex(), target_addr);
-            
+            println!(
+                "Storing data at contact: {} ({})",
+                contact.id.to_hex(),
+                target_addr
+            );
+
             let store_result = Networking::send_rpc_request(
                 self.own_id.clone(),
                 &target_addr,
                 Command::STORE,
                 Some(target_id.clone()),
-                Some(data.clone()),  // Send the data to be stored
-                None
-            ).await;
+                Some(data.clone()), // Send the data to be stored
+                None,
+            )
+            .await;
 
             match store_result {
                 Ok(_) => println!("Successfully stored data at {}", contact.id.to_hex()),

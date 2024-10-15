@@ -1,11 +1,10 @@
 use {
     crate::{
         constants::rpc::Command, contact::Contact, kademlia_id::KademliaID,
-        routing_table_handler::*, rpc::RpcMessage,
+        routing_table_handler::*, rpc::RpcMessage, utils,
     },
     bincode::{deserialize, serialize},
-    tokio::net::{lookup_host, ToSocketAddrs, UdpSocket},
-    tokio::sync::mpsc,
+    tokio::{net::{lookup_host, ToSocketAddrs, UdpSocket}, sync::mpsc},
 };
 
 pub struct Networking;
@@ -298,7 +297,19 @@ impl Networking {
                         );
                         let src_ip = src.ip().to_string();
                         let contact = Contact::new(id, src_ip.clone());
-                        let _ = tx.send(RouteTableCMD::AddContact(contact)).await;
+                        let _ = tx.send(RouteTableCMD::AddContact(contact)).await.expect("did not add bootnode as a contact");
+                        
+                        /*let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
+
+                        let _ = tx
+                                    .send(RouteTableCMD::GetClosestNodes(id, reply_tx))
+                                    .await;
+
+                        if let Some(contacts) = reply_rx.recv().await {
+                            println!("{:?}", contacts);
+                        } else {
+                            println!("no conacts from routing table");
+                        }*/
                     }
                     Command::FINDNODE => {
                         println!(
@@ -312,6 +323,19 @@ impl Networking {
                             for contact in &contacts {
                                 let _ = tx.send(RouteTableCMD::AddContact(contact.clone())).await;
                             }
+
+                            /*let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
+
+                            let _ = tx
+                                        .send(RouteTableCMD::GetClosestNodes(id, reply_tx))
+                                        .await;
+
+                            if let Some(contacts) = reply_rx.recv().await {
+                                println!("{:?}", contacts);
+                            } else {
+                                println!("no conacts from routing table");
+                            }*/
+
                         } else {
                             println!("{:?} missing contacts", result);
                         }

@@ -12,6 +12,8 @@ use {
     tokio::{sync::mpsc, task},
 };
 
+use tokio::time::{sleep, Duration, Instant};
+
 #[derive(Clone)]
 pub struct Kademlia {
     route_table_tx: mpsc::Sender<RouteTableCMD>,
@@ -63,6 +65,39 @@ impl Kademlia {
         .await
         .expect("Failed to send PING");
 
+        /*let max_wait_duration = Duration::from_secs(20);
+        let start_time = Instant::now();
+
+        loop {
+            let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
+            let _ = self
+                .route_table_tx
+                .send(RouteTableCMD::GetClosestNodes(self.own_id.clone(), reply_tx))
+                .await;
+
+            if let Some(contacts) = reply_rx.recv().await {
+                // Check if there are any contacts other than self
+                if contacts.iter().any(|c| c.id != self.own_id) {
+                    println!("Boot node has been added to the routing table.");
+                    break;
+                }
+            }
+
+            if start_time.elapsed() >= max_wait_duration {
+                println!("Timeout waiting for PONG response from boot node.");
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "Failed to receive PONG from boot node",
+                ));
+            }
+
+            // Wait a short duration before checking again
+            sleep(Duration::from_millis(100)).await;
+        }*/
+
+        sleep(Duration::from_millis(20000)).await;
+
+
         let contacts = self.iterative_find_node(self.own_id.clone()).await?;
 
         if contacts.is_empty() {
@@ -82,9 +117,23 @@ impl Kademlia {
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         let bucket_index = index_rx.recv().await.expect("Failed to get bucket index");
 
-        for i in (bucket_index + 1)..RT_BCKT_SIZE {
+        /*for i in (bucket_index + 1)..RT_BCKT_SIZE {
             let random_id = self.own_id.generate_random_id_in_bucket(i);
             let _ = self.iterative_find_node(random_id).await?;
+        }*/
+
+        sleep(Duration::from_millis(20000)).await;
+
+        let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
+
+        let _ = self.route_table_tx
+                    .send(RouteTableCMD::GetClosestNodes(self.own_id.clone(), reply_tx))
+                    .await;
+
+        if let Some(contacts) = reply_rx.recv().await {
+            println!("{:?}", contacts);
+        } else {
+            println!("no conacts from routing table");
         }
 
         Ok(())

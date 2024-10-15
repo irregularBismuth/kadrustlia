@@ -1,14 +1,8 @@
 use {
     crate::{
-        constants::{rpc::Command, ALPHA, BUCKET_SIZE, RT_BCKT_SIZE},
-        contact::Contact,
-        kademlia_id::KademliaID,
-        networking::Networking,
-        routing_table::RoutingTable,
-        routing_table_handler::*,
-        utils,
+        constants::{rpc::Command, ALPHA, BUCKET_SIZE, RT_BCKT_SIZE}, contact::Contact, kademlia_id::KademliaID, networking::Networking, routing_table::RoutingTable, routing_table_handler::*, rpc::RpcMessage, utils
     },
-    std::{collections::HashSet, time::Duration},
+    std::time::Duration,
     tokio::{sync::mpsc, task, time::sleep},
 };
 
@@ -16,6 +10,7 @@ use {
 pub struct Kademlia {
     route_table_tx: mpsc::Sender<RouteTableCMD>,
     own_id: KademliaID,
+    networking: Networking,
 }
 
 impl Kademlia {
@@ -31,15 +26,18 @@ impl Kademlia {
             routing_table_handler(rx, routing_table).await;
         });
 
+        let networking = Networking::new();
+
         Self {
             route_table_tx: tx,
             own_id: kad_id,
+            networking,
         }
     }
 
     pub async fn listen(&self, addr: &str) {
         let tx = self.route_table_tx.clone();
-        let _ = Networking::listen_for_rpc(tx, addr).await;
+        let _ = self.networking.listen_for_rpc(tx, addr).await;
     }
 
     pub async fn join(&self) -> std::io::Result<()> {
@@ -52,7 +50,7 @@ impl Kademlia {
 
         let own_contact = Contact::new(self.own_id.clone(), utils::get_own_address());
 
-        Networking::send_rpc_request(
+        self.networking.send_rpc_request_await(
             KademliaID::new(),
             &boot_node_addr,
             Command::PING,
@@ -113,7 +111,7 @@ impl Kademlia {
         let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
         let _ = self
             .route_table_tx
-            .send(RouteTableCMD::GetClosestNodes(target_id, reply_tx))
+            .send(RouteTableCMD::GetClosestNodes(target_id.clone(), reply_tx))
             .await;
 
         if let Some(initial_contacts) = reply_rx.recv().await {
@@ -123,7 +121,7 @@ impl Kademlia {
         }
 
         let mut closest_node_seen = None;
-        let mut closest_distance = KademliaID::new().distance(&target_id);
+        let mut closest_distance = self.own_id.distance(&target_id);
 
         while !shortlist.is_empty() {
             let unqueried_contacts: Vec<Contact> = shortlist
@@ -144,29 +142,35 @@ impl Kademlia {
                 let target_addr = format!("{}:{}", contact.address, "5678");
                 let target_id_copy = target_id.clone();
                 let own_id_copy = self.own_id.clone();
+                let networking_clone = self.networking.clone();
+                let contact_clone = contact.clone();
+                let rpc_id = KademliaID::new();
+    
                 let task = tokio::spawn(async move {
-                    Networking::send_rpc_request(
-                        own_id_copy,
-                        &target_addr,
-                        Command::FINDNODE,
-                        Some(target_id_copy),
-                        None,
-                        None,
-                    )
-                    .await
+                    let response = networking_clone
+                        .send_rpc_request_await(
+                            rpc_id,
+                            &target_addr,
+                            Command::FINDNODE,
+                            Some(target_id_copy),
+                            None,
+                            None,
+                        )
+                        .await;
+                    (response, contact_clone)
                 });
-                
-                tasks.push((task, contact.clone()));
+
+                tasks.push(task);
             }
 
-            for (task, queried_contact) in tasks {
-                if let Ok(Ok(())) = task.await {
-                    println!(
-                        "Received response from contact: {}",
-                        queried_contact.id.to_hex()
-                    );
+            for task in tasks {
+                match task.await {
+                    Ok((Ok(Some(RpcMessage::Response { contact: Some(received_contacts), .. })), queried_contact)) => {
+                        println!(
+                            "Received response from contact: {}",
+                            queried_contact.id.to_hex()
+                        );
 
-                    if let Some(received_contacts) = reply_rx.recv().await {
                         for new_contact in received_contacts {
                             println!(
                                 "Received new contact: {} from response",
@@ -193,12 +197,30 @@ impl Kademlia {
                             }
                         }
                     }
-                } else {
-                    println!(
-                        "Failed to receive response from contact: {}. Marking as unreachable.",
-                        queried_contact.id.to_hex()
-                    );
-                    shortlist.retain(|(contact, _)| contact.id != queried_contact.id);
+                    Ok((Ok(Some(_)), queried_contact)) => {
+                        println!(
+                            "Received response from contact: {} but no contacts",
+                            queried_contact.id.to_hex()
+                        );
+                    }
+                    Ok((Ok(None), queried_contact)) => {
+                        println!(
+                            "No response from contact: {} within timeout. Marking as unreachable.",
+                            queried_contact.id.to_hex()
+                        );
+                        shortlist.retain(|(contact, _)| contact.id != queried_contact.id);
+                    }
+                    Ok((Err(e), queried_contact)) => {
+                        println!(
+                            "Failed to send request to contact: {}. Error: {}. Marking as unreachable.",
+                            queried_contact.id.to_hex(),
+                            e
+                        );
+                        shortlist.retain(|(contact, _)| contact.id != queried_contact.id);
+                    }
+                    Err(e) => {
+                        println!("Task failed with error: {}", e);
+                    }
                 }
             }
 
@@ -238,7 +260,6 @@ impl Kademlia {
             })
             .collect();
 
-        // Sort the active contacts by distance
         active_contacts.sort_by(|a, b| a.get_distance().cmp(&b.get_distance()));
 
         println!(
@@ -253,7 +274,7 @@ impl Kademlia {
         let adr: String = utils::boot_node_address();
         let boot_node_addr: String = format!("{}:{}", adr, "5678");
         let own_id_copy = self.own_id.clone();
-        Networking::send_rpc_request(
+        self.networking.send_rpc_request(
             own_id_copy,
             &boot_node_addr,
             Command::FINDVALUE,
@@ -288,7 +309,7 @@ impl Kademlia {
             target_id.to_hex()
         );
 
-        // Step 1: Find the k closest nodes to the target ID using iterative_find_node
+        // find the k closest nodes to the target ID using iterative_find_node
         let closest_nodes = self.iterative_find_node(target_id.clone()).await?;
 
         if closest_nodes.is_empty() {
@@ -296,7 +317,7 @@ impl Kademlia {
             return Ok(());
         }
 
-        // Step 2: Send STORE RPC to each of the closest nodes
+        // send STORE RPC to each of the closest nodes
         for contact in closest_nodes {
             let target_addr = format!("{}:{}", contact.address, "5678");
             println!(
@@ -305,12 +326,12 @@ impl Kademlia {
                 target_addr
             );
 
-            let store_result = Networking::send_rpc_request(
+            let store_result = self.networking.send_rpc_request(
                 self.own_id.clone(),
                 &target_addr,
                 Command::STORE,
                 Some(target_id.clone()),
-                Some(data.clone()), // Send the data to be stored
+                Some(data.clone()),
                 None,
             )
             .await;

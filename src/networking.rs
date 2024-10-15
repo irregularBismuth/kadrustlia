@@ -5,9 +5,12 @@ use {
     },
     bincode::{deserialize, serialize},
     std::{collections::HashMap, sync::Arc, time::Duration},
-    tokio::{net::{lookup_host, ToSocketAddrs, UdpSocket}, sync::{mpsc, Mutex, Notify}, time::sleep},
+    tokio::{net::{lookup_host, ToSocketAddrs, UdpSocket}, sync::{mpsc, Mutex}, time::sleep},
 };
-type RpcMap = Arc<Mutex<HashMap<KademliaID, Arc<Notify>>>>;
+use tokio::sync::oneshot;
+
+type RpcMap = Arc<Mutex<HashMap<KademliaID, oneshot::Sender<RpcMessage>>>>;
+#[derive(Clone)]
 pub struct Networking {
     response_map: RpcMap,
 }
@@ -18,9 +21,55 @@ impl Networking {
         }
     }
 
-    //pub async fn send_await_request
+    pub async fn send_rpc_request_await(
+        &self,
+        rpc_id: KademliaID,
+        target_addr: &str,
+        cmd: Command,
+        target_id: Option<KademliaID>,
+        data: Option<String>,
+        contact: Option<Vec<Contact>>,
+    ) -> std::io::Result<Option<RpcMessage>> {
+        use tokio::sync::oneshot;
+
+        let (tx, rx) = oneshot::channel();
+
+        {
+            let mut map = self.response_map.lock().await;
+            map.insert(rpc_id.clone(), tx);
+        }
+
+        self.send_rpc_request(rpc_id.clone(), target_addr, cmd, target_id, data, contact)
+            .await?;
+
+        let timeout_duration = Duration::from_secs(15);
+        match tokio::time::timeout(timeout_duration, rx).await {
+            Ok(Ok(response)) => {
+                {
+                    let mut map = self.response_map.lock().await;
+                    map.remove(&rpc_id);
+                }
+                Ok(Some(response))
+            }
+            Ok(Err(_)) => {
+                {
+                    let mut map = self.response_map.lock().await;
+                    map.remove(&rpc_id);
+                }
+                Ok(None)
+            }
+            Err(_) => {
+                {
+                    let mut map = self.response_map.lock().await;
+                    map.remove(&rpc_id);
+                }
+                Ok(None)
+            }
+        }
+    }
 
     pub async fn send_rpc_request(
+        &self,
         rpc_id: KademliaID,
         target_addr: &str,
         cmd: Command,
@@ -43,7 +92,7 @@ impl Networking {
             break;
         }
 
-        sleep(Duration::from_millis(10000)).await;
+        //sleep(Duration::from_millis(10000)).await;
         Ok(())
     }
 
@@ -87,6 +136,7 @@ impl Networking {
     }
 
     pub async fn listen_for_rpc(
+        &self,
         mut tx: mpsc::Sender<RouteTableCMD>,
         bind_addr: &str,
     ) -> std::io::Result<()> {
@@ -121,7 +171,7 @@ impl Networking {
                         let contact = &contact_vec[0];
 
                         let _ = tx.send(RouteTableCMD::AddContact(contact.clone())).await;
-                        let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
+                        /*let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
 
                         let _ = tx
                             .send(RouteTableCMD::GetClosestNodes(contact.id.clone(), reply_tx))
@@ -131,7 +181,7 @@ impl Networking {
                             println!("{:?}", contacts);
                         } else {
                             println!("no conacts from routing table");
-                        }
+                        }*/
                         tokio::spawn(async move {
                             Networking::send_rpc_response(
                                 rpc_id,
@@ -193,19 +243,6 @@ impl Networking {
                             src,
                             rpc_id.to_hex()
                         );
-
-                        /*let src_ip = src.to_string();
-                        tokio::spawn(async move {
-                            Networking::send_rpc_response(
-                                &src_ip,
-                                Command::FINDVALUE,
-                                id,
-                                None,
-                                None,
-                            )
-                            .await
-                            .expect("no response was sent");
-                        });*/
 
                         if let Some(target_id) = target_id {
                             let dir = "data";
@@ -300,75 +337,96 @@ impl Networking {
                     result,
                     data,
                     contact,
-                } => match result {
-                    Command::PONG => {
-                        println!(
-                            "Received {:?} Response from {} rpc id {}",
-                            result,
-                            src,
-                            rpc_id.to_hex()
-                        );
-                        let src_ip = src.ip().to_string();
-                        let contact = Contact::new(rpc_id, src_ip.clone());
-                        let _ = tx.send(RouteTableCMD::AddContact(contact)).await;
-                    }
-                    Command::FINDNODE => {
-                        println!(
-                            "Received {:?} Response from {} rpc id {}",
-                            result,
-                            src,
-                            rpc_id.to_hex()
-                        );
+                } => {
+                    let sender_opt = {
+                        let mut map = self.response_map.lock().await;
+                        map.remove(&rpc_id)
+                    };
 
-                        if let Some(contacts) = contact {
-                            for contact in &contacts {
-                                let _ = tx.send(RouteTableCMD::AddContact(contact.clone())).await;
-                            }
-                        } else {
-                            println!("{:?} missing contacts", result);
+                    if let Some(sender) = sender_opt {
+
+                        let response_message = RpcMessage::Response {
+                            rpc_id: rpc_id.clone(),
+                            result,
+                            data: data.clone(),
+                            contact: contact.clone(),
+                        };
+
+                        let _ = sender.send(response_message);
+                    } else {
+                        println!("No waiting sender for rpc_id {}", rpc_id.to_hex());
+                    }
+
+                    match result {
+                        Command::PONG => {
+                            println!(
+                                "Received {:?} Response from {} rpc id {}",
+                                result,
+                                src,
+                                rpc_id.to_hex()
+                            );
+                            let src_ip = src.ip().to_string();
+                            let contact = Contact::new(rpc_id, src_ip.clone());
+                            let _ = tx.send(RouteTableCMD::AddContact(contact)).await;
                         }
-                    }
-                    Command::FINDVALUE => {
-                        println!(
-                            "Received {:?} Response from {} rpc id {}",
-                            result,
-                            src,
-                            rpc_id.to_hex()
-                        );
+                        Command::FINDNODE => {
+                            println!(
+                                "Received {:?} Response from {} rpc id {}",
+                                result,
+                                src,
+                                rpc_id.to_hex()
+                            );
 
-                        if let Some(value) = data {
-                            println!("value found: {}", value);
-                        } else if let Some(contacts) = contact {
-                            println!("contacts: {:?}", contacts);
-                            let id_hex = &rpc_id.to_hex();
-                            println!("id_hex: {}", id_hex);
-
-                            for i in contacts.iter() {
-                                let kadid = i.id.to_hex();
-                                println!("kadid: {}", kadid);
+                            if let Some(contacts) = contact {
+                                for contact in &contacts {
+                                    let _ = tx.send(RouteTableCMD::AddContact(contact.clone())).await;
+                                }
+                            } else {
+                                println!("{:?} missing contacts", result);
                             }
-
-                            for contact in &contacts {
-                                let _ = tx.send(RouteTableCMD::AddContact(contact.clone())).await;
-                            }
-                        } else {
-                            println!("{:?} response missing data and contacts", result);
                         }
-                    }
-                    Command::STORE => {
-                        println!(
-                            "Received {:?} Response from {} rpc id {}",
-                            result,
-                            src,
-                            rpc_id.to_hex()
-                        );
-                    }
-                    _ => {
-                        println!(
-                            "Received Response with ID {} and result: {:?}",
-                            rpc_id.to_hex(),
-                            result
-                        );
+                        Command::FINDVALUE => {
+                            println!(
+                                "Received {:?} Response from {} rpc id {}",
+                                result,
+                                src,
+                                rpc_id.to_hex()
+                            );
+
+                            if let Some(value) = data {
+                                println!("value found: {}", value);
+                            } else if let Some(contacts) = contact {
+                                println!("contacts: {:?}", contacts);
+                                let id_hex = &rpc_id.to_hex();
+                                println!("id_hex: {}", id_hex);
+
+                                for i in contacts.iter() {
+                                    let kadid = i.id.to_hex();
+                                    println!("kadid: {}", kadid);
+                                }
+
+                                for contact in &contacts {
+                                    let _ = tx.send(RouteTableCMD::AddContact(contact.clone())).await;
+                                }
+                            } else {
+                                println!("{:?} response missing data and contacts", result);
+                            }
+                        }
+                        Command::STORE => {
+                            println!(
+                                "Received {:?} Response from {} rpc id {}",
+                                result,
+                                src,
+                                rpc_id.to_hex()
+                            );
+                        }
+                        _ => {
+                            println!(
+                                "Received Response with ID {} and result: {:?}",
+                                rpc_id.to_hex(),
+                                result
+                            );
+                        }
                     }
                 },
                 RpcMessage::Error { rpc_id, message } => {

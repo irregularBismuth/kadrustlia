@@ -4,11 +4,8 @@ use {
         routing_table_handler::*, rpc::RpcMessage,
     },
     bincode::{deserialize, serialize},
-    std::collections::HashMap,
-    std::sync::Arc,
-    tokio::net::{lookup_host, ToSocketAddrs, UdpSocket},
-    tokio::sync::mpsc,
-    tokio::sync::{Mutex, Notify},
+    std::{collections::HashMap, sync::Arc, time::Duration},
+    tokio::{net::{lookup_host, ToSocketAddrs, UdpSocket}, sync::{mpsc, Mutex, Notify}, time::sleep},
 };
 type RpcMap = Arc<Mutex<HashMap<KademliaID, Arc<Notify>>>>;
 pub struct Networking {
@@ -20,8 +17,10 @@ impl Networking {
             response_map: Arc::new(Mutex::new(HashMap::new())),
         }
     }
+
+    //pub async fn send_await_request
+
     pub async fn send_rpc_request(
-        &self,
         rpc_id: KademliaID,
         target_addr: &str,
         cmd: Command,
@@ -29,13 +28,6 @@ impl Networking {
         data: Option<String>,
         contact: Option<Vec<Contact>>,
     ) -> std::io::Result<()> {
-        let notify = Arc::new(Notify::new());
-
-        {
-            let mut map = self.response_map.lock().await;
-            map.insert(rpc_id.clone(), notify.clone());
-        }
-
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         let rpc_msg = RpcMessage::Request {
             rpc_id,
@@ -51,18 +43,11 @@ impl Networking {
             break;
         }
 
-        let notify_fut = notify.notified();
-
-        {
-            let mut map = self.response_map.lock().await;
-            map.remove(&rpc_id);
-        }
-
+        sleep(Duration::from_millis(10000)).await;
         Ok(())
     }
 
     pub async fn send_rpc_response(
-        &self,
         rpc_id: KademliaID,
         target_addr: &str,
         cmd: Command,
@@ -102,7 +87,6 @@ impl Networking {
     }
 
     pub async fn listen_for_rpc(
-        &self,
         mut tx: mpsc::Sender<RouteTableCMD>,
         bind_addr: &str,
     ) -> std::io::Result<()> {
@@ -150,7 +134,6 @@ impl Networking {
                         }
                         tokio::spawn(async move {
                             Networking::send_rpc_response(
-                                self,
                                 rpc_id,
                                 &src.ip().to_string(),
                                 Command::PONG,

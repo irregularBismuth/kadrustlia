@@ -8,8 +8,8 @@ use {
         routing_table_handler::*,
         utils,
     },
-    std::collections::HashSet,
-    tokio::{sync::mpsc, task},
+    std::{collections::HashSet, time::Duration},
+    tokio::{sync::mpsc, task, time::sleep},
 };
 
 #[derive(Clone)]
@@ -53,7 +53,7 @@ impl Kademlia {
         let own_contact = Contact::new(self.own_id.clone(), utils::get_own_address());
 
         Networking::send_rpc_request(
-            KademliaID::new(), //rpc id
+            KademliaID::new(),
             &boot_node_addr,
             Command::PING,
             None,
@@ -68,6 +68,32 @@ impl Kademlia {
         if contacts.is_empty() {
             println!("No contacts found during iterative find node.");
             ()
+        }
+
+        let closest_neighbor = contacts[0].clone();
+
+        let (index_tx, mut index_rx) = mpsc::channel(1);
+        self.route_table_tx
+            .send(RouteTableCMD::GetBucketIndex(
+                closest_neighbor.id.clone(),
+                index_tx,
+            ))
+            .await
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let bucket_index = index_rx.recv().await.expect("Failed to get bucket index");
+
+        //sleep(Duration::from_millis(10000)).await;
+
+        let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
+
+        let _ = self.route_table_tx
+                    .send(RouteTableCMD::GetClosestNodes(self.own_id.clone(), reply_tx))
+                    .await;
+
+        if let Some(contacts) = reply_rx.recv().await {
+            println!("{:?}", contacts);
+        } else {
+            println!("no conacts from routing table");
         }
 
         Ok(())
@@ -129,7 +155,7 @@ impl Kademlia {
                     )
                     .await
                 });
-
+                
                 tasks.push((task, contact.clone()));
             }
 

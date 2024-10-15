@@ -9,7 +9,7 @@ use {
 
 type KadId = [u8; ID_LENGTH];
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Hash)]
 pub struct KademliaID {
     pub id: KadId,
 }

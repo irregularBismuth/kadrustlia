@@ -26,7 +26,7 @@ pub async fn routing_table_handler(
                 routing_table.add_contact(contact);
                 //println!("{:?}", routing_table.find_closest_contacts(kad_id, 5));
             }
-            RouteTableCMD::RemoveContact(kad_id) => {
+            RouteTableCMD::RemoveContact(_kad_id) => {
                 println!("remove  coibntact");
             }
             RouteTableCMD::GetClosestNodes(target_id, reply) => {

@@ -5,20 +5,20 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 pub enum RpcMessage {
     Request {
-        id: KademliaID,
+        rpc_id: KademliaID,
         method: Command,
         target_id: Option<KademliaID>,
         data: Option<String>,
         contact: Option<Vec<Contact>>,
     },
     Response {
-        id: KademliaID,
+        rpc_id: KademliaID,
         result: Command,
         data: Option<String>,
         contact: Option<Vec<Contact>>,
     },
     Error {
-        id: KademliaID,
+        rpc_id: KademliaID,
         message: String,
     },
 }

@@ -44,7 +44,7 @@ impl Kademlia {
 
     pub async fn join(&self) -> std::io::Result<()> {
         if utils::check_bn() {
-            return Ok(());
+            ()
         }
         let adr: String = utils::boot_node_address();
         let boot_node_addr: String = format!("{}:{}", adr, "5678");
@@ -53,7 +53,7 @@ impl Kademlia {
         let own_contact = Contact::new(self.own_id.clone(), utils::get_own_address());
 
         Networking::send_rpc_request(
-            self.own_id.clone(),
+            KademliaID::new(), //rpc id
             &boot_node_addr,
             Command::PING,
             None,
@@ -67,24 +67,7 @@ impl Kademlia {
 
         if contacts.is_empty() {
             println!("No contacts found during iterative find node.");
-            return Ok(());
-        }
-
-        let closest_neighbor = contacts[0].clone();
-
-        let (index_tx, mut index_rx) = mpsc::channel(1);
-        self.route_table_tx
-            .send(RouteTableCMD::GetBucketIndex(
-                closest_neighbor.id.clone(),
-                index_tx,
-            ))
-            .await
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        let bucket_index = index_rx.recv().await.expect("Failed to get bucket index");
-
-        for i in (bucket_index + 1)..RT_BCKT_SIZE {
-            let random_id = self.own_id.generate_random_id_in_bucket(i);
-            let _ = self.iterative_find_node(random_id).await?;
+            ()
         }
 
         Ok(())
@@ -146,6 +129,7 @@ impl Kademlia {
                     )
                     .await
                 });
+
                 tasks.push((task, contact.clone()));
             }
 
@@ -268,12 +252,19 @@ impl Kademlia {
         Ok(())
     }
 
-    pub async fn iterative_store(&self, target_id: KademliaID, data: String) -> std::io::Result<()> {
-        println!("Starting iterative store for target ID: {}", target_id.to_hex());
+    pub async fn iterative_store(
+        &self,
+        target_id: KademliaID,
+        data: String,
+    ) -> std::io::Result<()> {
+        println!(
+            "Starting iterative store for target ID: {}",
+            target_id.to_hex()
+        );
 
         // Step 1: Find the k closest nodes to the target ID using iterative_find_node
         let closest_nodes = self.iterative_find_node(target_id.clone()).await?;
-        
+
         if closest_nodes.is_empty() {
             println!("No contacts found to store data.");
             return Ok(());
@@ -282,16 +273,21 @@ impl Kademlia {
         // Step 2: Send STORE RPC to each of the closest nodes
         for contact in closest_nodes {
             let target_addr = format!("{}:{}", contact.address, "5678");
-            println!("Storing data at contact: {} ({})", contact.id.to_hex(), target_addr);
-            
+            println!(
+                "Storing data at contact: {} ({})",
+                contact.id.to_hex(),
+                target_addr
+            );
+
             let store_result = Networking::send_rpc_request(
                 self.own_id.clone(),
                 &target_addr,
                 Command::STORE,
                 Some(target_id.clone()),
-                Some(data.clone()),  // Send the data to be stored
-                None
-            ).await;
+                Some(data.clone()), // Send the data to be stored
+                None,
+            )
+            .await;
 
             match store_result {
                 Ok(_) => println!("Successfully stored data at {}", contact.id.to_hex()),

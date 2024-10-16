@@ -31,7 +31,7 @@ mod tests {
         println!("Generating contacts...");
 
         for i in 0..21 {
-            let hex_value = format!("{:040X}", i); // Generate sequential Kademlia IDs
+            let hex_value = format!("{:040X}", i);
             println!("Generated KademliaID: {}", hex_value);
 
             let kad_id = KademliaID::from_hex(hex_value.clone());
@@ -56,24 +56,20 @@ mod tests {
             closest_contacts.len()
         );
 
-        let excluded_id =
-            KademliaID::from_hex("0FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF".to_string());
-        let excluded_contact = Contact::new(excluded_id.clone(), "123".to_string());
-
         println!("Checking closest contacts to {}:", target_id.to_hex());
-        let mut found_excluded = false;
 
-        for contact in closest_contacts.iter() {
+        // expected IDs are from 0x0000000000000000000000000000000000000014 down to 0x0000000000000000000000000000000000000001
+        for (i, contact) in closest_contacts.iter().enumerate() {
+            let expected_id = format!("{:040X}", 20 - i);
+            assert_eq!(
+                contact.id.to_hex().to_uppercase(),
+                expected_id,
+                "Contact ID at position {} does not match expected ID {}",
+                i,
+                expected_id
+            );
             println!("Closest contact ID: {}", contact.id.to_hex());
-            if contact.id.to_hex() == excluded_contact.id.to_hex() {
-                found_excluded = true;
-            }
         }
-
-        assert!(
-        found_excluded,
-        "The excluded contact (0x0FFFFFFFF...) was not found but should be among the closest contacts!"
-    );
     }
     #[test]
     fn xor_metric_triangle_inequality() {

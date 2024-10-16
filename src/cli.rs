@@ -56,16 +56,28 @@ impl Cli {
     async fn execute_command(&self, cmd: Command) -> CMDStatus {
         match cmd {
             Command::GET(hash) => {
-                //let target_id = KademliaID::from_hex(hash);
-                self.kademlia.find_value(KademliaID::new()).await.unwrap();
+                let target_id = KademliaID::from_hex(hash);
+                match self.kademlia.iterative_find_value(target_id).await {
+                    Ok(Some(value)) => {
+                        // println!("Value found: {}", value);
+                    }
+                    Ok(None) => {
+                        println!("Value not found.");
+                    }
+                    Err(err) => {
+                        println!("Error finding value: {}", err);
+                    }
+                }
                 CMDStatus::CONTINUE
             }
             Command::PUT(data) => {
-                let target_id = KademliaID::new();
-                self.kademlia.iterative_store(target_id, data).await.unwrap();
+                let target_id = KademliaID::from_data(&data);
+                println!("Data will be stored with key: {}", target_id.to_hex());
+                self.kademlia
+                    .iterative_store(target_id, data)
+                    .await
+                    .unwrap();
                 CMDStatus::CONTINUE
-
-                //self.kademlia.store(data).await.unwrap();
             }
             Command::FINDNODE(target_id_hex) => {
                 let target_id = KademliaID::from_hex(target_id_hex);

@@ -10,14 +10,13 @@ async fn root() -> &'static str {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // REST interface ##################
+    // REST interface
     tokio::spawn(async move {
         let app = Router::new().route("/", get(root));
         let ip = format!("{}:{}", ALL_IPV4, "3000");
         let listener = tokio::net::TcpListener::bind(ip).await.unwrap();
         axum::serve(listener, app).await.unwrap();
     });
-    //#################################
 
     let bind_addr = format!("{}:{}", ALL_IPV4, "5678");
 

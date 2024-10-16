@@ -7,6 +7,29 @@ mod tests {
     use crate::kademlia_id::KademliaID;
     use crate::routing_table::RoutingTable;
     #[test]
+    fn test_contact_placed_in_correct_bucket() {
+        let my_id = KademliaID::new();
+        let me = Contact::new(my_id.clone(), "127.0.0.1".to_string());
+        let mut routing_table = RoutingTable::new(me.clone());
+
+        for i in 0..BUCKET_SIZE {
+            let contact_id = my_id.generate_random_id_in_bucket(i);
+            let contact = Contact::new(contact_id.clone(), format!("127.0.0.{}", i));
+
+            let expected_bucket_index = routing_table.get_bucket_index(contact_id.clone());
+
+            routing_table.add_contact(contact.clone());
+
+            let actual_bucket_index = routing_table.get_bucket_index(contact_id);
+
+            assert_eq!(
+                expected_bucket_index, actual_bucket_index,
+                "Contact was placed in the wrong bucket"
+            );
+        }
+    }
+
+    #[test]
     fn test_duplicate_contact_in_bucket() {
         let mut bucket = Bucket::new();
         let target_id = KademliaID::new();

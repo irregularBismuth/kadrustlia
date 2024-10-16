@@ -123,7 +123,6 @@ impl Networking {
         let mut attempts = 0;
         while attempts < 3 {
             if let Err(e) = socket.send_to(&bin_data, &target).await {
-                println!("Attempt {} to send failed: {}", attempts + 1, e);
                 attempts += 1;
             } else {
                 println!("Successfully sent on attempt {}", attempts + 1);
@@ -140,7 +139,7 @@ impl Networking {
         bind_addr: &str,
     ) -> std::io::Result<()> {
         let socket = UdpSocket::bind(bind_addr).await?;
-        println!("Listening for RPC messages on {}", bind_addr);
+        // println!("Listening for RPC messages on {}", bind_addr);
 
         let mut buf = [0u8; 65507];
 
@@ -215,7 +214,7 @@ impl Networking {
                                     .expect("no response was sent");
                                 });
                             } else {
-                                println!("no conacts from routing table");
+                                println!("no contacts from routing table");
                             }
                         } else {
                             println!("{:?} request missing target_id", method);
@@ -260,12 +259,6 @@ impl Networking {
                                     let src_ip = src.to_string();
                                     let id_hex = rpc_id.to_hex();
                                     let own_id_copy = rpc_id.clone();
-                                    println!("id_hex: {}", id_hex);
-
-                                    for i in contacts.iter() {
-                                        let kadid = i.id.to_hex();
-                                        println!("kadid: {}", kadid);
-                                    }
 
                                     tokio::spawn(async move {
                                         Networking::send_rpc_response(
@@ -362,7 +355,7 @@ impl Networking {
 
                         let _ = sender.send(response_message);
                     } else {
-                        println!("No waiting sender for rpc_id {}", rpc_id.to_hex());
+                        // println!("No waiting sender for rpc_id {}", rpc_id.to_hex());
                     }
 
                     match result {
@@ -406,13 +399,6 @@ impl Networking {
                                 // continue
                             } else if let Some(contacts) = contact {
                                 println!("contacts: {:?}", contacts);
-                                let id_hex = &rpc_id.to_hex();
-                                println!("id_hex: {}", id_hex);
-
-                                for i in contacts.iter() {
-                                    let kadid = i.id.to_hex();
-                                    println!("kadid: {}", kadid);
-                                }
 
                                 for contact in &contacts {
                                     let _ =

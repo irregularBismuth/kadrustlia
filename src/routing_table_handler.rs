@@ -18,14 +18,13 @@ pub async fn routing_table_handler(
     mut rx: mpsc::Receiver<RouteTableCMD>,
     mut routing_table: RoutingTable,
 ) {
-    println!("route table handler");
     while let Some(cmd) = rx.recv().await {
         match cmd {
             RouteTableCMD::AddContact(contact) => {
                 routing_table.add_contact(contact);
             }
             RouteTableCMD::RemoveContact(_kad_id) => {
-                println!("remove  coibntact");
+                println!("Remove  contact");
             }
             RouteTableCMD::GetClosestNodes(target_id, reply) => {
                 let contacts = routing_table.find_closest_contacts(target_id, BUCKET_SIZE);

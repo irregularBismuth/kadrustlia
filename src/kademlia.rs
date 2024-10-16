@@ -75,7 +75,8 @@ impl Kademlia {
             ()
         }
 
-        let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
+        // print contacts [DONT DELETE]
+        /*let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
 
         let _ = self
             .route_table_tx
@@ -89,7 +90,7 @@ impl Kademlia {
             println!("{:?}", contacts);
         } else {
             println!("no conacts from routing table");
-        }
+        }*/
 
         Ok(())
     }
@@ -239,10 +240,10 @@ impl Kademlia {
                 .collect();
 
             if active_contacts.len() >= BUCKET_SIZE {
-                println!(
+                /*println!(
                     "Found {} active contacts, ending lookup.",
                     active_contacts.len()
-                );
+                );*/
                 return Ok(active_contacts);
             }
 
@@ -264,10 +265,10 @@ impl Kademlia {
 
         active_contacts.sort_by(|a, b| a.get_distance().cmp(&b.get_distance()));
 
-        println!(
+        /*println!(
             "Finished iterative find node. Found {} active contacts.",
             active_contacts.len()
-        );
+        );*/
         Ok(active_contacts)
     }
 

@@ -30,7 +30,6 @@ impl Networking {
         data: Option<String>,
         contact: Option<Vec<Contact>>,
     ) -> std::io::Result<Option<RpcMessage>> {
-        use tokio::sync::oneshot;
 
         let (tx, rx) = oneshot::channel();
 

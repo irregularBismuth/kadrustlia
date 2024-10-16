@@ -292,13 +292,6 @@ impl Kademlia {
         Ok(())
     }
 
-    pub async fn store(&self, data: String) -> std::io::Result<()> {
-        let mut kad_id = KademliaID::new();
-        kad_id.store_data(data.clone()).await;
-        println!("Data stored with kademlia id: {}", kad_id.to_hex());
-        Ok(())
-    }
-
     pub async fn iterative_store(
         &self,
         target_id: KademliaID,

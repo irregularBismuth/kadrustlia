@@ -1,6 +1,6 @@
 use crate::{
     bucket::Bucket,
-    constants::{BUCKET_SIZE, ID_LENGTH, RT_BCKT_SIZE},
+    constants::{ID_LENGTH, RT_BCKT_SIZE},
     contact::Contact,
     contact::ContactCandidates,
     kademlia_id::KademliaID,
@@ -20,8 +20,8 @@ impl RoutingTable {
         }
     }
 
-    pub fn get_bucket_index(&mut self, id: KademliaID) -> usize {
-        let distance: KademliaID = self.me.calc_distance(&id).get_distance();
+    pub fn get_bucket_index(&self, id: KademliaID) -> usize {
+        let distance = self.me.id.distance(&id);
 
         if let Some(position) = distance
             .id
@@ -29,22 +29,22 @@ impl RoutingTable {
             .flat_map(|&byte| (0..8).rev().map(move |i| (byte >> i) & 1))
             .position(|bit| bit != 0)
         {
-            position
+            let bucket_index = (ID_LENGTH * 8 - 1) - position;
+            bucket_index
         } else {
             0
         }
     }
 
+
     pub fn add_contact(&mut self, contact: Contact) {
         let index: usize = self.get_bucket_index(contact.id.clone());
         match &mut self.buckets[index] {
             Some(bucket) => {
-                // Pass the contact by reference to add_contact
                 bucket.add_contact(&contact, contact.id);
             }
             None => {
                 let mut bucket = Bucket::new();
-                // Pass the contact by reference to add_contact
                 bucket.add_contact(&contact, contact.id);
                 self.buckets[index] = Some(bucket);
             }
@@ -79,8 +79,8 @@ impl RoutingTable {
             }
             i += 1;
         }
-
         candidates.sort();
+
         let mut count_ = count;
         if count_ > candidates.len() {
             count_ = candidates.len();

@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod tests {
+    use crate::contact::Contact;
     use crate::kademlia_id::KademliaID;
+    use crate::routing_table::RoutingTable;
+
     #[test]
     fn xor_metric() {
         let kad_id_1: KademliaID = KademliaID::new();
@@ -18,53 +21,79 @@ mod tests {
             "The distance should be greater than zero "
         );
     }
+    #[test]
+    fn test_find_closest_contacts() {
+        let my_id = KademliaID::from_hex("0000000000000000000000000000000000000000".to_string());
+        let me = Contact::new(my_id.clone(), "1256".to_string());
 
+        let mut routing_table = RoutingTable::new(me);
+
+        println!("Generating contacts...");
+
+        for i in 0..21 {
+            let hex_value = format!("{:040X}", i);
+            println!("Generated KademliaID: {}", hex_value);
+
+            let kad_id = KademliaID::from_hex(hex_value.clone());
+            let contact = Contact::new(kad_id.clone(), "123".to_string());
+
+            routing_table.add_contact(contact);
+            println!(
+                "Added contact with ID: {} to routing table.",
+                kad_id.to_hex()
+            );
+        }
+
+        let target_id =
+            KademliaID::from_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF".to_string());
+
+        let closest_contacts = routing_table.find_closest_contacts(target_id.clone(), 20);
+
+        assert_eq!(
+            closest_contacts.len(),
+            20,
+            "Expected 20 closest contacts but got {}",
+            closest_contacts.len()
+        );
+
+        println!("Checking closest contacts to {}:", target_id.to_hex());
+
+        // expected IDs are from 0x0000000000000000000000000000000000000014 down to 0x0000000000000000000000000000000000000001
+        for (i, contact) in closest_contacts.iter().enumerate() {
+            let expected_id = format!("{:040X}", 20 - i);
+            assert_eq!(
+                contact.id.to_hex().to_uppercase(),
+                expected_id,
+                "Contact ID at position {} does not match expected ID {}",
+                i,
+                expected_id
+            );
+            println!("Closest contact ID: {}", contact.id.to_hex());
+        }
+    }
     #[test]
     fn xor_metric_triangle_inequality() {
         let kad_id_1 = KademliaID::new();
         let kad_id_2 = KademliaID::new();
         let kad_id_3 = KademliaID::new();
+
         let ab = kad_id_1.distance(&kad_id_2);
         let bc = kad_id_2.distance(&kad_id_3);
         let ac = kad_id_1.distance(&kad_id_3);
-        let distance_ab_num = xor_distance_to_num(&ab);
-        let distance_bc_num = xor_distance_to_num(&bc);
-        let distance_ac_num = xor_distance_to_num(&ac);
-        let sum_ab_bc = add_160bit_numbers(&distance_ab_num, &distance_bc_num);
+
+        let mut ab_and_bc = Big160::new();
+        ab_and_bc.add(&ab, &bc);
+        let ab_bc_hex = ab_and_bc.to_hex();
+        let ac_hex = ac.to_hex();
+
+        let padded_ac_hex = format!("{:0>80}", ac_hex);
+        println!("Sum (ab + bc) in hex: {}", ab_bc_hex);
+        println!("Distance ac in hex (padded): {}", padded_ac_hex);
+
         assert!(
-            compare_xor_distances(&distance_ac_num, &sum_ab_bc) != std::cmp::Ordering::Greater,
+            padded_ac_hex <= ab_bc_hex,
             "Triangle inequality failed: d(A, C) > d(A, B) + d(B, C)"
         );
-    }
-
-    fn add_160bit_numbers(a: &[u32; 5], b: &[u32; 5]) -> [u32; 5] {
-        let mut result = [0u32; 5];
-        let mut carry = 0u64;
-
-        for i in (0..5).rev() {
-            let sum = a[i] as u64 + b[i] as u64 + carry;
-            result[i] = sum as u32;
-            carry = sum >> 32;
-        }
-        result
-    }
-
-    fn compare_xor_distances(a: &[u32; 5], b: &[u32; 5]) -> std::cmp::Ordering {
-        for (a_part, b_part) in a.iter().zip(b.iter()) {
-            match a_part.cmp(b_part) {
-                std::cmp::Ordering::Equal => continue,
-                other => return other,
-            }
-        }
-        std::cmp::Ordering::Equal
-    }
-
-    fn xor_distance_to_num(xor_distance: &KademliaID) -> [u32; 5] {
-        let mut num = [0u32; 5];
-        for (i, chunk) in xor_distance.id.chunks(4).enumerate() {
-            num[i] = u32::from_be_bytes(chunk.try_into().unwrap());
-        }
-        num
     }
 
     #[tokio::test]
@@ -78,5 +107,43 @@ mod tests {
             .await
             .to_hex();
         assert_eq!(kad_id, kad_id2, "Don't have same hash");
+    }
+
+    struct Big160 {
+        parts: [u32; 10],
+    }
+
+    impl Big160 {
+        fn new() -> Big160 {
+            Big160 { parts: [0; 10] }
+        }
+
+        fn add(&mut self, a: &KademliaID, b: &KademliaID) {
+            let mut carry = 0u64;
+
+            for i in (0..5).rev() {
+                let a_part =
+                    u32::from_be_bytes(a.id[i * 4..(i + 1) * 4].try_into().unwrap()) as u64;
+                let b_part =
+                    u32::from_be_bytes(b.id[i * 4..(i + 1) * 4].try_into().unwrap()) as u64;
+                let sum = a_part + b_part + carry;
+
+                self.parts[i] = (sum & 0xFFFFFFFF) as u32;
+                carry = sum >> 32;
+            }
+
+            for i in 5..10 {
+                self.parts[i] = carry as u32;
+                carry = 0;
+            }
+        }
+
+        pub fn to_hex(&self) -> String {
+            self.parts
+                .iter()
+                .map(|part| format!("{:08x}", part))
+                .collect::<Vec<String>>()
+                .join("")
+        }
     }
 }

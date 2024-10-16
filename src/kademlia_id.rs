@@ -9,7 +9,7 @@ use {
 
 type KadId = [u8; ID_LENGTH];
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Hash)]
 pub struct KademliaID {
     pub id: KadId,
 }
@@ -18,6 +18,13 @@ impl KademliaID {
     pub fn new() -> Self {
         let mut id: KadId = [0u8; ID_LENGTH];
         rand::thread_rng().fill(&mut id[..]);
+        Self { id }
+    }
+
+    pub fn from_data(data: &str) -> Self {
+        let hash = Sha256::digest(data.as_bytes());
+        let mut id: KadId = [0u8; ID_LENGTH];
+        id.copy_from_slice(&hash[..ID_LENGTH]);
         Self { id }
     }
 

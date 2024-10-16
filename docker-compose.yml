@@ -20,7 +20,7 @@ services:
       - BNPT=50051
     deploy:
       mode: replicated
-      replicas: 20
+      replicas: 50
     stdin_open: true
     tty: true
     networks:

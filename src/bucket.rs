@@ -1,8 +1,6 @@
 use crate::constants::BUCKET_SIZE;
 use crate::contact::Contact;
 use crate::kademlia_id::KademliaID;
-use serde::Deserialize;
-use serde::Serialize;
 use std::collections::LinkedList;
 
 #[derive(Clone)]

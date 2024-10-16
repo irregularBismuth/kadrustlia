@@ -1,6 +1,6 @@
 use {
     crate::{
-        constants::{rpc::Command, ALPHA, BUCKET_SIZE, RT_BCKT_SIZE},
+        constants::{rpc::Command, ALPHA, BUCKET_SIZE},
         contact::Contact,
         kademlia_id::KademliaID,
         networking::Networking,
@@ -9,8 +9,7 @@ use {
         rpc::RpcMessage,
         utils,
     },
-    std::time::Duration,
-    tokio::{sync::mpsc, task, time::sleep},
+    tokio::sync::mpsc,
 };
 
 #[derive(Clone)]
@@ -49,7 +48,7 @@ impl Kademlia {
 
     pub async fn join(&self) -> std::io::Result<()> {
         if utils::check_bn() {
-            (return Ok(()))
+            return Ok(())
         }
         let adr: String = utils::boot_node_address();
         let boot_node_addr: String = format!("{}:{}", adr, "5678");
@@ -75,18 +74,6 @@ impl Kademlia {
             println!("No contacts found during iterative find node.");
             ()
         }
-
-        let closest_neighbor = contacts[0].clone();
-
-        let (index_tx, mut index_rx) = mpsc::channel(1);
-        self.route_table_tx
-            .send(RouteTableCMD::GetBucketIndex(
-                closest_neighbor.id.clone(),
-                index_tx,
-            ))
-            .await
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        let bucket_index = index_rx.recv().await.expect("Failed to get bucket index");
 
         let (reply_tx, mut reply_rx) = mpsc::channel::<Vec<Contact>>(1);
 
@@ -151,7 +138,6 @@ impl Kademlia {
                 println!("Querying contact: {}", contact.id.to_hex());
                 let target_addr = format!("{}:{}", contact.address, "5678");
                 let target_id_copy = target_id.clone();
-                let own_id_copy = self.own_id.clone();
                 let networking_clone = self.networking.clone();
                 let contact_clone = contact.clone();
                 let rpc_id = KademliaID::new();
@@ -285,28 +271,6 @@ impl Kademlia {
         Ok(active_contacts)
     }
 
-    pub async fn find_value(&self, target_id: KademliaID) -> std::io::Result<()> {
-        let adr: String = utils::boot_node_address();
-        let boot_node_addr: String = format!("{}:{}", adr, "5678");
-        let own_id_copy = self.own_id.clone();
-        self.networking
-            .send_rpc_request(
-                own_id_copy,
-                &boot_node_addr,
-                Command::FINDVALUE,
-                Some(target_id),
-                None,
-                None,
-            )
-            .await
-            .expect("failed");
-
-        println!("ben");
-
-        println!("Value found or contacts returned");
-        Ok(())
-    }
-
     pub async fn iterative_find_value(
         &self,
         target_id: KademliaID,
@@ -377,7 +341,6 @@ impl Kademlia {
                         })),
                         _queried_contact,
                     )) => {
-                        // Value found
                         println!("Value found: {}", value);
                         return Ok(Some(value));
                     }

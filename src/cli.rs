@@ -58,8 +58,8 @@ impl Cli {
             Command::GET(hash) => {
                 let target_id = KademliaID::from_hex(hash);
                 match self.kademlia.iterative_find_value(target_id).await {
-                    Ok(Some(value)) => {
-                        // println!("Value found: {}", value);
+                    Ok(Some(_)) => {
+                        // continue
                     }
                     Ok(None) => {
                         println!("Value not found.");

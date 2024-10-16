@@ -1,6 +1,6 @@
 use crate::{
     bucket::Bucket,
-    constants::{BUCKET_SIZE, ID_LENGTH, RT_BCKT_SIZE},
+    constants::{ID_LENGTH, RT_BCKT_SIZE},
     contact::Contact,
     contact::ContactCandidates,
     kademlia_id::KademliaID,

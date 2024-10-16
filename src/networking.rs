@@ -4,12 +4,10 @@ use {
         constants::rpc::Command, contact::Contact, kademlia_id::KademliaID,
         routing_table_handler::*, rpc::RpcMessage,
     },
-    bincode::{deserialize, serialize},
     std::{collections::HashMap, sync::Arc, time::Duration},
     tokio::{
-        net::{lookup_host, ToSocketAddrs, UdpSocket},
+        net::{lookup_host, UdpSocket},
         sync::{mpsc, Mutex},
-        time::sleep,
     },
 };
 
@@ -404,8 +402,8 @@ impl Networking {
                                 rpc_id.to_hex()
                             );
 
-                            if let Some(value) = data {
-                                // println!("value found: {}", value);
+                            if let Some(_) = data {
+                                // continue
                             } else if let Some(contacts) = contact {
                                 println!("contacts: {:?}", contacts);
                                 let id_hex = &rpc_id.to_hex();

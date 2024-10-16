@@ -1,7 +1,7 @@
 use tokio::sync::mpsc;
 
 use crate::{
-    constants::{ALPHA, BUCKET_SIZE},
+    constants::BUCKET_SIZE,
     contact::Contact,
     kademlia_id::KademliaID,
     routing_table::RoutingTable,

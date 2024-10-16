@@ -48,7 +48,7 @@ impl Kademlia {
 
     pub async fn join(&self) -> std::io::Result<()> {
         if utils::check_bn() {
-            return Ok(())
+            return Ok(());
         }
         let adr: String = utils::boot_node_address();
         let boot_node_addr: String = format!("{}:{}", adr, "5678");
@@ -340,9 +340,13 @@ impl Kademlia {
                         Ok(Some(RpcMessage::Response {
                             data: Some(value), ..
                         })),
-                        _queried_contact,
+                        queried_contact,
                     )) => {
-                        println!("Value found: {}", value);
+                        println!(
+                            "Value found: {} from node {}",
+                            value,
+                            queried_contact.id.to_hex(),
+                        );
                         return Ok(Some(value));
                     }
                     Ok((

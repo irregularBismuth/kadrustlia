@@ -32,7 +32,6 @@ impl Networking {
         data: Option<String>,
         contact: Option<Vec<Contact>>,
     ) -> std::io::Result<Option<RpcMessage>> {
-
         let (tx, rx) = oneshot::channel();
 
         {
@@ -122,7 +121,7 @@ impl Networking {
 
         let mut attempts = 0;
         while attempts < 3 {
-            if let Err(e) = socket.send_to(&bin_data, &target).await {
+            if let Err(_) = socket.send_to(&bin_data, &target).await {
                 attempts += 1;
             } else {
                 println!("Successfully sent on attempt {}", attempts + 1);
@@ -135,7 +134,7 @@ impl Networking {
 
     pub async fn listen_for_rpc(
         &self,
-        mut tx: mpsc::Sender<RouteTableCMD>,
+        tx: mpsc::Sender<RouteTableCMD>,
         bind_addr: &str,
     ) -> std::io::Result<()> {
         let socket = UdpSocket::bind(bind_addr).await?;
@@ -257,7 +256,6 @@ impl Networking {
                                     let contacts_cp = contacts.clone();
                                     println!("contacts: {:?}", contacts_cp);
                                     let src_ip = src.to_string();
-                                    let id_hex = rpc_id.to_hex();
                                     let own_id_copy = rpc_id.clone();
 
                                     tokio::spawn(async move {

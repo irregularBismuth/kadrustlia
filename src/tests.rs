@@ -31,7 +31,7 @@ mod tests {
         println!("Generating contacts...");
 
         for i in 0..21 {
-            let hex_value = format!("{:040X}", i); // Generate sequential Kademlia IDs
+            let hex_value = format!("{:040X}", i);
             println!("Generated KademliaID: {}", hex_value);
 
             let kad_id = KademliaID::from_hex(hex_value.clone());

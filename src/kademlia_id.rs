@@ -21,6 +21,13 @@ impl KademliaID {
         Self { id }
     }
 
+    pub fn from_data(data: &str) -> Self {
+        let hash = Sha256::digest(data.as_bytes());
+        let mut id: KadId = [0u8; ID_LENGTH];
+        id.copy_from_slice(&hash[..ID_LENGTH]);
+        Self { id }
+    }
+
     pub fn generate_random_id_in_bucket(&self, bucket_index: usize) -> Self {
         let mut rng = rand::thread_rng();
         let mut id = self.id;

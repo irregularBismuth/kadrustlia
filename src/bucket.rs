@@ -17,7 +17,9 @@ impl Bucket {
     pub fn add_contact(&mut self, contact: &Contact, target: KademliaID) -> &Self {
         let mut contact_clone = contact.clone();
         contact_clone.calc_distance(&target);
-
+        if self.list.iter().any(|c| c.id == contact.id) {
+            return self;
+        }
         if self.list.len() < BUCKET_SIZE {
             self.list.push_back(contact_clone);
         } else {

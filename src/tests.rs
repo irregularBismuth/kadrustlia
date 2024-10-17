@@ -1,12 +1,86 @@
 #[cfg(test)]
 mod tests {
+    use crate::bucket::Bucket;
+    use crate::constants::BUCKET_SIZE;
+    use crate::constants::RT_BCKT_SIZE;
     use crate::contact::Contact;
     use crate::kademlia_id::KademliaID;
     use crate::routing_table::RoutingTable;
+    #[test]
+    fn test_contact_placed_in_correct_bucket() {
+        let my_id = KademliaID::new();
+        let me = Contact::new(my_id.clone(), "127.0.0.1".to_string());
+        let mut routing_table = RoutingTable::new(me.clone());
+
+        for i in 0..BUCKET_SIZE {
+            let contact_id = my_id.generate_random_id_in_bucket(i);
+            let contact = Contact::new(contact_id.clone(), format!("127.0.0.{}", i));
+
+            let expected_bucket_index = routing_table.get_bucket_index(contact_id.clone());
+
+            routing_table.add_contact(contact.clone());
+
+            let actual_bucket_index = routing_table.get_bucket_index(contact_id);
+
+            assert_eq!(
+                expected_bucket_index, actual_bucket_index,
+                "Contact was placed in the wrong bucket"
+            );
+        }
+    }
+
+    #[test]
+    fn test_duplicate_contact_in_bucket() {
+        let mut bucket = Bucket::new();
+        let target_id = KademliaID::new();
+        let contact_id = target_id.generate_random_id_in_bucket(0);
+        let contact = Contact::new(contact_id.clone(), "127.0.0.1".to_string());
+
+        bucket.add_contact(&contact, target_id.clone());
+        bucket.add_contact(&contact, target_id.clone());
+
+        assert_eq!(
+            bucket.len(),
+            1,
+            "Duplicate contact should not increase bucket size"
+        );
+    }
+    #[test]
+    fn test_empty_bucket() {
+        let mut bucket = Bucket::new();
+        let target_id = KademliaID::new();
+
+        let contacts = bucket.get_contact_and_calc_distance(target_id.clone());
+        assert_eq!(contacts.len(), 0, "Expected empty bucket but got contacts");
+    }
+
+    #[test]
+    fn test_routing_table_bucket_indexing() {
+        let my_id = KademliaID::new();
+        let me = Contact::new(my_id.clone(), "127.0.0.1".to_string());
+        let mut routing_table = RoutingTable::new(me.clone());
+
+        for i in 0..BUCKET_SIZE {
+            let contact_id = my_id.generate_random_id_in_bucket(i);
+            let contact = Contact::new(contact_id.clone(), format!("127.0.0.{}", i));
+            let bucket_index = routing_table.get_bucket_index(contact_id.clone());
+            assert!(bucket_index < RT_BCKT_SIZE, "Bucket index out of bounds");
+
+            routing_table.add_contact(contact.clone());
+        }
+    }
 
     #[test]
     fn xor_metric() {
         let kad_id_1: KademliaID = KademliaID::new();
+        let kad_id_2 = KademliaID::new();
+
+        assert_eq!(
+            kad_id_1.distance(&kad_id_2),
+            kad_id_2.distance(&kad_id_1),
+            "xor is symmetric"
+        );
+
         let zero_distance = KademliaID::with_id([0u8; 20]);
         assert_eq!(
             kad_id_1.distance(&kad_id_1).to_hex(),
@@ -21,6 +95,43 @@ mod tests {
             "The distance should be greater than zero "
         );
     }
+    #[test]
+    fn test_full_routing_table() {
+        let my_id = KademliaID::new();
+        let me = Contact::new(my_id.clone(), "127.0.0.1".to_string());
+        let mut routing_table = RoutingTable::new(me.clone());
+
+        for i in 0..(BUCKET_SIZE * 2) {
+            let contact_id = my_id.generate_random_id_in_bucket(i);
+            let contact = Contact::new(contact_id.clone(), format!("127.0.0.{}", i));
+            routing_table.add_contact(contact);
+        }
+
+        let target_id = my_id.generate_random_id_in_bucket(1);
+        let closest_contacts = routing_table.find_closest_contacts(target_id.clone(), BUCKET_SIZE);
+
+        assert!(
+            closest_contacts.len() > 0,
+            "Expected some contacts in routing table"
+        );
+    }
+    #[test]
+    fn test_kademlia_id_edge_cases() {
+        let zero_id = KademliaID::from_hex("0000000000000000000000000000000000000000".to_string());
+        let zero_id_hex = zero_id.to_hex();
+        assert_eq!(
+            zero_id_hex, "0000000000000000000000000000000000000000",
+            "Expected all-zero Kademlia ID"
+        );
+
+        let one_id = KademliaID::from_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF".to_string());
+        let one_id_hex = one_id.to_hex().to_uppercase();
+        assert_eq!(
+            one_id_hex, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+            "Expected all-one Kademlia ID"
+        );
+    }
+
     #[test]
     fn test_find_closest_contacts() {
         let my_id = KademliaID::from_hex("0000000000000000000000000000000000000000".to_string());
@@ -58,7 +169,6 @@ mod tests {
 
         println!("Checking closest contacts to {}:", target_id.to_hex());
 
-        // expected IDs are from 0x0000000000000000000000000000000000000014 down to 0x0000000000000000000000000000000000000001
         for (i, contact) in closest_contacts.iter().enumerate() {
             let expected_id = format!("{:040X}", 20 - i);
             assert_eq!(
@@ -70,6 +180,24 @@ mod tests {
             );
             println!("Closest contact ID: {}", contact.id.to_hex());
         }
+    }
+
+    #[test]
+    fn test_add_contact_to_bucket() {
+        let mut bucket = Bucket::new();
+        let target_id = KademliaID::new();
+
+        for i in 0..(BUCKET_SIZE + 5) {
+            let contact_id = target_id.generate_random_id_in_bucket(i);
+            let contact = Contact::new(contact_id, format!("address{}", i));
+            bucket.add_contact(&contact, target_id);
+        }
+
+        assert_eq!(
+            bucket.len(),
+            BUCKET_SIZE,
+            "Bucket size exceeded the BUCKET_SIZE limit"
+        );
     }
     #[test]
     fn xor_metric_triangle_inequality() {

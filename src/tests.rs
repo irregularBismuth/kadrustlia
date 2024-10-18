@@ -504,14 +504,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_iterative_find_value_with_empty_routing_table() {
-        // Arrange: Create a new Kademlia instance with an empty routing table
         let kademlia = Kademlia::new();
         let target_id = KademliaID::new();
 
-        // Act: Call iterative_find_value with an empty routing table
         let result = kademlia.iterative_find_value(target_id).await;
 
-        // Assert: Ensure that no value is found since the routing table is empty
         assert!(result.is_ok(), "Expected Ok, but got an error");
         let value = result.unwrap();
         assert!(value.is_none(), "Expected no value, but found some data");
@@ -531,20 +528,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_iterative_store_no_contacts() {
-        // Arrange: Create a new Kademlia instance and mock `iterative_find_node` to return no contacts
         let kademlia = Kademlia::new();
         let target_id = KademliaID::new();
-
-        // Mocking the `iterative_find_node` to return an empty vector
         let mock_closest_nodes: Vec<Contact> = vec![];
 
-        // Simulate that `iterative_find_node` returns no contacts
         let kademlia_clone = kademlia.clone();
         let result = kademlia_clone
             .iterative_store(target_id, "test data".to_string())
             .await;
 
-        // Assert: Since no contacts are found, the store operation should just return Ok
         assert!(result.is_ok(), "Expected Ok, but got an error");
     }
 

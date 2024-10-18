@@ -23,3 +23,6 @@ output.txt
 
 # The data folder
 data/
+
+# The tarpaulin coverage folder
+tarpaulin-report.html

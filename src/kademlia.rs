@@ -16,7 +16,7 @@ use {
 pub struct Kademlia {
     pub route_table_tx: mpsc::Sender<RouteTableCMD>,
     pub own_id: KademliaID,
-    networking: Networking,
+    pub networking: Networking,
 }
 
 impl Kademlia {

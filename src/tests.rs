@@ -622,4 +622,56 @@ mod tests {
 
         server_task.await.unwrap();
     }
+    #[tokio::test]
+    async fn test_rpc_timeout() {
+        let networking = Networking::new();
+        let rpc_id = KademliaID::new();
+        let target_addr = "127.0.0.1:12345"; // Assuming no service here
+        let result = networking
+            .send_rpc_request_await(
+                rpc_id.clone(),
+                target_addr,
+                otherCommand::PING,
+                None,
+                None,
+                None,
+            )
+            .await;
+        assert!(result.is_ok(), "Request should not fail");
+        assert!(
+            result.unwrap().is_none(),
+            "Expected no response due to timeout"
+        );
+    }
+
+    #[test]
+    fn test_calc_distance() {
+        let id1 = KademliaID::new();
+        let id2 = KademliaID::new();
+        let mut contact = Contact::new(id1.clone(), "127.0.0.1:8080".to_string());
+
+        contact.calc_distance(&id2);
+        let expected_distance = id1.distance(&id2);
+
+        assert_eq!(
+            contact.get_distance(),
+            expected_distance,
+            "Distance calculation is incorrect"
+        );
+    }
+
+    #[test]
+    fn test_calc_distance_same_id() {
+        let id = KademliaID::new();
+        let mut contact = Contact::new(id.clone(), "127.0.0.1:8080".to_string());
+
+        contact.calc_distance(&id);
+        let expected_distance = KademliaID::with_id([0u8; 20]);
+
+        assert_eq!(
+            contact.get_distance(),
+            expected_distance,
+            "Distance should be zero for the same ID"
+        );
+    }
 }

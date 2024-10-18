@@ -6,15 +6,17 @@ mod tests {
 
     use crate::bucket::Bucket;
     use crate::cli::{CMDStatus, Cli, Command};
-    use crate::constants::{BUCKET_SIZE, ID_LENGTH, RT_BCKT_SIZE};
+    use crate::constants::{rpc::Command as otherCommand, BUCKET_SIZE, ID_LENGTH, RT_BCKT_SIZE};
     use crate::contact::Contact;
     use crate::kademlia::Kademlia;
     use crate::kademlia_id::KademliaID;
     use crate::networking::Networking;
     use crate::routing_table::RoutingTable;
     use crate::routing_table_handler::{routing_table_handler, RouteTableCMD};
+    use crate::rpc::RpcMessage;
+    use tokio::net::UdpSocket;
     use tokio::sync::{broadcast, mpsc};
-
+    use tokio::time::sleep;
     #[test]
     fn test_contact_placed_in_correct_bucket() {
         let my_id = KademliaID::new();
@@ -478,5 +480,64 @@ mod tests {
         let data = "test data".to_string();
         let result = kademlia.iterative_store(target_id, data).await;
         assert!(result.is_ok(), "iterative_store failed: {:?}", result.err());
+    }
+    #[tokio::test]
+    async fn test_send_rpc_request() {
+        let server_socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let server_addr = server_socket.local_addr().unwrap();
+
+        let (msg_tx, mut msg_rx) = mpsc::channel(1);
+
+        let server_task = tokio::spawn(async move {
+            let mut buf = [0u8; 65507];
+            let (len, _src) = server_socket.recv_from(&mut buf).await.unwrap();
+
+            let received_msg: RpcMessage =
+                bincode::deserialize(&buf[..len]).expect("Failed to deserialize data");
+
+            msg_tx.send(received_msg).await.unwrap();
+        });
+
+        let networking = Networking::new();
+
+        let rpc_id = KademliaID::new();
+        let target_addr = server_addr.to_string();
+
+        let result = networking
+            .send_rpc_request(
+                rpc_id.clone(),
+                &target_addr,
+                otherCommand::PING,
+                None,
+                None,
+                None,
+            )
+            .await;
+
+        assert!(
+            result.is_ok(),
+            "Failed to send RPC request: {:?}",
+            result.err()
+        );
+
+        sleep(Duration::from_millis(100)).await;
+
+        if let Some(received_msg) = msg_rx.recv().await {
+            match received_msg {
+                RpcMessage::Request {
+                    rpc_id: received_rpc_id,
+                    method,
+                    ..
+                } => {
+                    assert_eq!(received_rpc_id, rpc_id, "RPC IDs do not match");
+                    assert_eq!(method, otherCommand::PING, "Unexpected RPC command");
+                }
+                _ => panic!("Expected RpcMessage::Request"),
+            }
+        } else {
+            panic!("Did not receive message on the server");
+        }
+
+        server_task.await.unwrap();
     }
 }

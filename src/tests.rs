@@ -1,3 +1,8 @@
+use crate::{
+    contact::Contact, kademlia::Kademlia, kademlia_id::KademliaID,
+    routing_table_handler::RouteTableCMD,
+};
+
 #[cfg(test)]
 mod tests {
     use std::cmp::Ordering;
@@ -459,6 +464,49 @@ mod tests {
             CMDStatus::EXIT => assert!(true),
             _ => assert!(false, "Expected CMDStatus::EXIT"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_iterative_find_node_with_empty_routing_table() {
+        // Arrange: Create a new Kademlia instance with an empty routing table
+        let kademlia = Kademlia::new();
+        let target_id = KademliaID::new();
+
+        // Act: Call iterative_find_node with an empty routing table
+        let result = kademlia.iterative_find_node(target_id).await;
+
+        // Assert: Ensure that the result is an empty list, as there are no contacts in the routing table
+        assert!(result.is_ok(), "Expected Ok, but got an error");
+        let contacts = result.unwrap();
+        assert!(contacts.is_empty(), "Expected no contacts, but got some");
+    }
+
+    #[tokio::test]
+    async fn test_iterative_find_node_with_network_failure() {
+        // Arrange: Mock the networking to simulate a failure in contacting a node
+        let kademlia = Kademlia::new();
+        let target_id = KademliaID::new();
+        let contact_id = KademliaID::new();
+        let contact = Contact::new(contact_id.clone(), "127.0.0.1:8080".to_string());
+
+        // Insert the contact into the routing table
+        kademlia
+            .route_table_tx
+            .send(RouteTableCMD::AddContact(contact.clone()))
+            .await
+            .unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        // Act: Simulate iterative_find_node where networking fails
+        let result = kademlia.iterative_find_node(target_id).await;
+
+        // Assert: Ensure that no new contacts are added, and the process finishes
+        assert!(result.is_ok(), "Expected Ok, but got an error");
+        let contacts = result.unwrap();
+        assert!(
+            contacts.is_empty(),
+            "Expected no new contacts after failure"
+        );
     }
 
     #[tokio::test]

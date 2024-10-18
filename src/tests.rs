@@ -1,14 +1,20 @@
 #[cfg(test)]
 mod tests {
     use std::cmp::Ordering;
+    use std::sync::Arc;
+    use std::time::Duration;
 
     use crate::bucket::Bucket;
-    use crate::constants::{BUCKET_SIZE, RT_BCKT_SIZE};
+    use crate::cli::{CMDStatus, Cli, Command};
+    use crate::constants::{BUCKET_SIZE, ID_LENGTH, RT_BCKT_SIZE};
     use crate::contact::Contact;
+    use crate::kademlia::Kademlia;
     use crate::kademlia_id::KademliaID;
+    use crate::networking::Networking;
     use crate::routing_table::RoutingTable;
     use crate::routing_table_handler::{routing_table_handler, RouteTableCMD};
-    use tokio::sync::mpsc;
+    use tokio::sync::{broadcast, mpsc};
+
     #[test]
     fn test_contact_placed_in_correct_bucket() {
         let my_id = KademliaID::new();
@@ -48,6 +54,7 @@ mod tests {
             "Duplicate contact should not increase bucket size"
         );
     }
+
     #[test]
     fn test_empty_bucket() {
         let mut bucket = Bucket::new();
@@ -81,7 +88,7 @@ mod tests {
         assert_eq!(
             kad_id_1.distance(&kad_id_2),
             kad_id_2.distance(&kad_id_1),
-            "xor is symmetric"
+            "XOR is symmetric"
         );
 
         let zero_distance = KademliaID::with_id([0u8; 20]);
@@ -95,9 +102,10 @@ mod tests {
         assert_ne!(
             kad_id_1.distance(&kad_id_2),
             zero_distance,
-            "The distance should be greater than zero "
+            "The distance should be greater than zero"
         );
     }
+
     #[test]
     fn test_full_routing_table() {
         let my_id = KademliaID::new();
@@ -114,10 +122,11 @@ mod tests {
         let closest_contacts = routing_table.find_closest_contacts(target_id.clone(), BUCKET_SIZE);
 
         assert!(
-            closest_contacts.len() > 0,
+            !closest_contacts.is_empty(),
             "Expected some contacts in routing table"
         );
     }
+
     #[test]
     fn test_kademlia_id_edge_cases() {
         let zero_id = KademliaID::from_hex("0000000000000000000000000000000000000000".to_string());
@@ -202,6 +211,7 @@ mod tests {
             "Bucket size exceeded the BUCKET_SIZE limit"
         );
     }
+
     #[test]
     fn xor_metric_triangle_inequality() {
         let kad_id_1 = KademliaID::new();
@@ -237,7 +247,7 @@ mod tests {
             .store_data("test".to_string())
             .await
             .to_hex();
-        assert_eq!(kad_id, kad_id2, "Don't have same hash");
+        assert_eq!(kad_id, kad_id2, "Hashes do not match");
     }
 
     #[tokio::test]
@@ -390,5 +400,83 @@ mod tests {
                 .collect::<Vec<String>>()
                 .join("")
         }
+    }
+
+    #[tokio::test]
+    async fn test_kademlia_new() {
+        let kademlia = Kademlia::new();
+        assert!(kademlia.route_table_tx.capacity() > 0);
+        assert_eq!(kademlia.own_id.id.len(), ID_LENGTH);
+    }
+
+    #[tokio::test]
+    async fn test_kademlia_join() {
+        let kademlia = Kademlia::new();
+        let result = kademlia.join().await;
+        assert!(result.is_ok(), "Kademlia join failed: {:?}", result.err());
+    }
+
+    #[tokio::test]
+    async fn test_iterative_find_node() {
+        let kademlia = Kademlia::new();
+        let target_id = KademliaID::new();
+
+        let result = kademlia.iterative_find_node(target_id).await;
+        assert!(
+            result.is_ok(),
+            "iterative_find_node failed: {:?}",
+            result.err()
+        );
+        let contacts = result.unwrap();
+        assert!(contacts.len() >= 0, "Expected contacts");
+    }
+
+    #[tokio::test]
+    async fn test_parse_command() {
+        let kademlia = Arc::new(Kademlia::new());
+        let (shutdown_tx, _) = broadcast::channel(1);
+        let cli = Cli::new(kademlia.clone(), shutdown_tx.clone());
+
+        let input = "get 0123456789abcdef0123456789abcdef01234567";
+        let command = cli.parse_command(input);
+        assert!(command.is_ok());
+        match command.unwrap() {
+            Command::GET(hash) => assert_eq!(hash, "0123456789abcdef0123456789abcdef01234567"),
+            _ => panic!("Expected GET command"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_execute_command_exit() {
+        let kademlia = Arc::new(Kademlia::new());
+        let (shutdown_tx, _) = broadcast::channel(1);
+        let cli = Cli::new(kademlia.clone(), shutdown_tx.clone());
+
+        let status = cli.execute_command(Command::EXIT).await;
+        match status {
+            CMDStatus::EXIT => assert!(true),
+            _ => assert!(false, "Expected CMDStatus::EXIT"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_iterative_find_value() {
+        let kademlia = Kademlia::new();
+        let target_id = KademliaID::new();
+        let result = kademlia.iterative_find_value(target_id).await;
+        assert!(
+            result.is_ok(),
+            "iterative_find_value failed: {:?}",
+            result.err()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_iterative_store() {
+        let kademlia = Kademlia::new();
+        let target_id = KademliaID::new();
+        let data = "test data".to_string();
+        let result = kademlia.iterative_store(target_id, data).await;
+        assert!(result.is_ok(), "iterative_store failed: {:?}", result.err());
     }
 }

@@ -17,12 +17,12 @@ pub fn boot_node_address() -> String {
 }
 
 pub fn get_own_address() -> String {
-    #[cfg(feature = "local")]
+    #[cfg(not(feature = "local"))]
     {
         "127.0.0.1".to_string()
     }
 
-    #[cfg(not(feature = "local"))]
+    #[cfg(feature = "local")]
     {
         let output = process::Command::new("hostname")
             .arg("-i")

@@ -1,10 +1,7 @@
 use tokio::sync::mpsc;
 
 use crate::{
-    constants::BUCKET_SIZE,
-    contact::Contact,
-    kademlia_id::KademliaID,
-    routing_table::RoutingTable,
+    constants::BUCKET_SIZE, contact::Contact, kademlia_id::KademliaID, routing_table::RoutingTable,
 };
 
 pub enum RouteTableCMD {
@@ -24,7 +21,7 @@ pub async fn routing_table_handler(
                 routing_table.add_contact(contact);
             }
             RouteTableCMD::RemoveContact(_kad_id) => {
-                println!("Remove  contact");
+                //                println!("Remove  contact");
             }
             RouteTableCMD::GetClosestNodes(target_id, reply) => {
                 let contacts = routing_table.find_closest_contacts(target_id, BUCKET_SIZE);

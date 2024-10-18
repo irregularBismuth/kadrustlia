@@ -11,7 +11,7 @@ WORKDIR /usr/src/kadrustlia
 
 COPY . .
 
-RUN cargo build --release --target x86_64-unknown-linux-musl
+RUN cargo build --release --target x86_64-unknown-linux-musl --features local
 
 FROM alpine:latest
 
@@ -22,3 +22,4 @@ RUN apk update && apk add --no-cache file iproute2 iputils-ping
 COPY --from=cargo-build /usr/src/kadrustlia/target/x86_64-unknown-linux-musl/release/kadrustlia .
 
 CMD ["./kadrustlia"]
+

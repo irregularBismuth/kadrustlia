@@ -1,11 +1,14 @@
 #[cfg(test)]
 mod tests {
+    use std::cmp::Ordering;
+
     use crate::bucket::Bucket;
-    use crate::constants::BUCKET_SIZE;
-    use crate::constants::RT_BCKT_SIZE;
+    use crate::constants::{BUCKET_SIZE, RT_BCKT_SIZE};
     use crate::contact::Contact;
     use crate::kademlia_id::KademliaID;
     use crate::routing_table::RoutingTable;
+    use crate::routing_table_handler::{routing_table_handler, RouteTableCMD};
+    use tokio::sync::mpsc;
     #[test]
     fn test_contact_placed_in_correct_bucket() {
         let my_id = KademliaID::new();
@@ -235,6 +238,120 @@ mod tests {
             .await
             .to_hex();
         assert_eq!(kad_id, kad_id2, "Don't have same hash");
+    }
+
+    #[tokio::test]
+    async fn test_routing_table_handler() {
+        let local_id = KademliaID::new();
+        let local_contact = Contact::new(local_id.clone(), "127.0.0.1:8080".to_string());
+        let routing_table = RoutingTable::new(local_contact.clone());
+
+        let (tx, rx) = mpsc::channel::<RouteTableCMD>(32);
+
+        tokio::spawn(async move {
+            routing_table_handler(rx, routing_table).await;
+        });
+
+        let contact_id = KademliaID::new();
+        let contact = Contact::new(contact_id.clone(), "127.0.0.1:8081".to_string());
+
+        tx.send(RouteTableCMD::AddContact(contact.clone()))
+            .await
+            .unwrap();
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let (reply_tx, mut reply_rx) = mpsc::channel(1);
+        tx.send(RouteTableCMD::GetBucketIndex(contact_id.clone(), reply_tx))
+            .await
+            .unwrap();
+
+        let bucket_index = reply_rx.recv().await.expect("Did not receive bucket index");
+
+        assert!(
+            bucket_index < RT_BCKT_SIZE,
+            "Bucket index out of range: {}",
+            bucket_index
+        );
+
+        let (reply_tx, mut reply_rx) = mpsc::channel(1);
+        tx.send(RouteTableCMD::GetClosestNodes(contact_id.clone(), reply_tx))
+            .await
+            .unwrap();
+
+        let closest_contacts = reply_rx.recv().await.expect("Did not receive contacts");
+
+        assert_eq!(
+            closest_contacts.len(),
+            1,
+            "Expected 1 closest contact, got {}",
+            closest_contacts.len()
+        );
+        assert_eq!(
+            closest_contacts[0].id, contact_id,
+            "The contact ID does not match"
+        );
+    }
+
+    #[test]
+    fn test_contact_from_hex() {
+        let hex_id = "0123456789abcdef0123456789abcdef01234567".to_string();
+        let address = "127.0.0.1:8080".to_string();
+
+        let contact = Contact::contact_from_hex(hex_id.clone(), address.clone());
+
+        assert_eq!(contact.id.to_hex(), hex_id, "Contact ID does not match");
+        assert_eq!(contact.address, address, "Contact address does not match");
+    }
+
+    #[test]
+    fn test_contact_less() {
+        let target_id = KademliaID::new();
+
+        let mut contact1 = Contact::new(KademliaID::new(), "127.0.0.1:8081".to_string());
+        contact1.calc_distance(&target_id);
+
+        let mut contact2 = Contact::new(KademliaID::new(), "127.0.0.1:8082".to_string());
+        contact2.calc_distance(&target_id);
+
+        let less = contact1.less(contact2.clone());
+
+        let expected = contact1.get_distance().less(&contact2.get_distance());
+
+        assert_eq!(less, expected, "Contact less comparison failed");
+    }
+
+    #[test]
+    fn test_kademlia_id_from_data() {
+        let data = "some test data";
+        let id1 = KademliaID::from_data(data);
+        let id2 = KademliaID::from_data(data);
+
+        assert_eq!(id1, id2, "KademliaIDs from the same data should be equal");
+    }
+
+    #[test]
+    fn test_kademlia_id_partial_ord() {
+        let id1 = KademliaID::from_hex("0000000000000000000000000000000000000001".to_string());
+        let id2 = KademliaID::from_hex("0000000000000000000000000000000000000002".to_string());
+        let id3 = KademliaID::from_hex("0000000000000000000000000000000000000001".to_string());
+
+        assert!(id1 < id2, "id1 should be less than id2");
+        assert!(id2 > id1, "id2 should be greater than id1");
+        assert_eq!(
+            id1.partial_cmp(&id3),
+            Some(Ordering::Equal),
+            "id1 should equal id3"
+        );
+    }
+
+    #[test]
+    fn test_kademlia_id_cmp_equal() {
+        let id1 = KademliaID::from_hex("ABCDEF1234567890ABCDEF1234567890ABCDEF12".to_string());
+        let id2 = KademliaID::from_hex("ABCDEF1234567890ABCDEF1234567890ABCDEF12".to_string());
+
+        let ordering = id1.cmp(&id2);
+        assert_eq!(ordering, Ordering::Equal, "Expected Ordering::Equal");
     }
 
     struct Big160 {

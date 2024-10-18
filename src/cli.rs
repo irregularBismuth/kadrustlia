@@ -4,10 +4,10 @@ use ::tokio::io::{self, AsyncBufReadExt, AsyncWriteExt};
 
 use crate::{kademlia::Kademlia, kademlia_id::KademliaID};
 
-enum Command {
+pub enum Command {
     GET(String),
     PUT(String),
-    FINDNODE(String),
+    //    FINDNODE(String),
     EXIT,
 }
 #[derive(Clone)]
@@ -16,7 +16,7 @@ pub struct Cli {
     shutdown_tx: tokio::sync::broadcast::Sender<()>,
 }
 
-enum CMDStatus {
+pub enum CMDStatus {
     CONTINUE,
     EXIT,
 }
@@ -53,7 +53,7 @@ impl Cli {
         }
     }
 
-    async fn execute_command(&self, cmd: Command) -> CMDStatus {
+    pub async fn execute_command(&self, cmd: Command) -> CMDStatus {
         match cmd {
             Command::GET(hash) => {
                 let target_id = KademliaID::from_hex(hash);
@@ -79,7 +79,7 @@ impl Cli {
                     .unwrap();
                 CMDStatus::CONTINUE
             }
-            Command::FINDNODE(target_id_hex) => {
+            /* Command::FINDNODE(target_id_hex) => {
                 let target_id = KademliaID::from_hex(target_id_hex);
                 match self.kademlia.iterative_find_node(target_id).await {
                     Ok(contacts) => {
@@ -90,7 +90,7 @@ impl Cli {
                     }
                 }
                 CMDStatus::CONTINUE
-            }
+            } */
             Command::EXIT => {
                 println!("Exiting...");
                 let _ = self.shutdown_tx.send(());
@@ -99,7 +99,7 @@ impl Cli {
         }
     }
 
-    fn parse_command(&self, input: &str) -> Result<Command, &'static str> {
+    pub fn parse_command(&self, input: &str) -> Result<Command, &'static str> {
         let mut parts = input.split_whitespace();
         let command = parts.next().unwrap_or_default();
 
@@ -118,13 +118,13 @@ impl Cli {
                     Err("PUT: missing data argument")
                 }
             }
-            "findnode" => {
+            /*            "findnode" => {
                 if let Some(arg) = parts.next() {
                     Ok(Command::FINDNODE(arg.to_string()))
                 } else {
                     Err("FINDNODE: missing target_id argument")
                 }
-            }
+            } */
             "exit" => Ok(Command::EXIT),
             _ => Err("Unknown command"),
         }

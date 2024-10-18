@@ -14,9 +14,9 @@ use {
 
 #[derive(Clone)]
 pub struct Kademlia {
-    route_table_tx: mpsc::Sender<RouteTableCMD>,
-    own_id: KademliaID,
-    networking: Networking,
+    pub route_table_tx: mpsc::Sender<RouteTableCMD>,
+    pub own_id: KademliaID,
+    pub networking: Networking,
 }
 
 impl Kademlia {
@@ -51,7 +51,17 @@ impl Kademlia {
             return Ok(());
         }
         let adr: String = utils::boot_node_address();
-        let boot_node_addr: String = format!("{}:{}", adr, "5678");
+        let mut boot_node_addr: String;
+        #[cfg(not(feature = "local"))]
+        {
+            let adr = "127.0.0.1".to_string();
+            boot_node_addr = format!("{}:{}", adr, "5678");
+        }
+        #[cfg(feature = "local")]
+        {
+            boot_node_addr = format!("{}:{}", adr, "5678");
+        }
+
         println!("Boot node address: {}", boot_node_addr);
 
         let own_contact = Contact::new(self.own_id.clone(), utils::get_own_address());

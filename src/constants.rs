@@ -6,7 +6,7 @@ pub const RT_BCKT_SIZE: usize = ID_LENGTH << 3;
 pub mod rpc {
     use serde::{Deserialize, Serialize};
 
-    #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+    #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
     pub enum Command {
         PING,
         PONG,
